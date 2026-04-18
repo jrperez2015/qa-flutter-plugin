@@ -1,0 +1,10 @@
+{
+  "name": "qa-flutter",
+  "description": "QA stability agents and runners for Flutter Android and Flutter web projects",
+  "version": "1.0.0",
+  "author": {
+    "name": "José Rolando Pérez Sandó",
+    "email": "jrperez2015@gmail.com"
+  },
+  "keywords": ["qa", "flutter", "android", "web", "stability"]
+}
