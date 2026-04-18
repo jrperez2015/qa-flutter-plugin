@@ -1,0 +1,76 @@
+name: Validate Plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check plugin.json required fields
+        run: |
+          node -e "
+            const p = require('./.claude-plugin/plugin.json');
+            const required = ['name', 'description', 'author'];
+            const missing = required.filter(f => !p[f]);
+            if (missing.length) { console.error('plugin.json missing:', missing); process.exit(1); }
+            console.log('plugin.json OK');
+          "
+
+      - name: Check SKILL.md frontmatter in all skills
+        run: |
+          for dir in skills/*/; do
+            file="$dir/SKILL.md"
+            if [ ! -f "$file" ]; then
+              echo "MISSING: $file"
+              exit 1
+            fi
+            if ! head -1 "$file" | grep -q "^---"; then
+              echo "MISSING frontmatter in: $file"
+              exit 1
+            fi
+            if ! grep -q "^name:" "$file"; then
+              echo "MISSING 'name:' in: $file"
+              exit 1
+            fi
+            if ! grep -q "^description:" "$file"; then
+              echo "MISSING 'description:' in: $file"
+              exit 1
+            fi
+            echo "OK: $file"
+          done
+
+      - name: Check agent frontmatter
+        run: |
+          for file in agents/*.md; do
+            if ! head -1 "$file" | grep -q "^---"; then
+              echo "MISSING frontmatter in: $file"
+              exit 1
+            fi
+            if ! grep -q "^name:" "$file"; then
+              echo "MISSING 'name:' in: $file"
+              exit 1
+            fi
+            if ! grep -q "^model:" "$file"; then
+              echo "MISSING 'model:' in: $file"
+              exit 1
+            fi
+            echo "OK: $file"
+          done
+
+      - name: Check for hardcoded absolute paths
+        run: |
+          if grep -rEn "[A-Z]:[/\\]" skills/ agents/ 2>/dev/null; then
+            echo "ERROR: hardcoded Windows absolute paths found (see above)"
+            exit 1
+          fi
+          if grep -rn "/home/[a-zA-Z]" skills/ agents/ 2>/dev/null; then
+            echo "ERROR: hardcoded Unix home paths found (see above)"
+            exit 1
+          fi
+          echo "No hardcoded paths found. OK."
