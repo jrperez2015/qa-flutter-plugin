@@ -2,7 +2,9 @@
 
 QA stability plugin for Flutter projects (Android + Web).
 
-One agent auto-detects your platform from `qa-agent.yaml` and routes to the correct runner skill — Appium for Android or a static checklist generator for Flutter web.
+For **Android** projects, it runs Appium UI tests against your app and generates per-feature Markdown reports. For **Flutter web** projects, it runs `flutter analyze`, `flutter test`, and `flutter build web`, analyzes the git diff, and produces a manual test checklist for the changed areas.
+
+One orchestrator agent auto-detects your platform from `qa-agent.yaml` and routes to the correct runner skill automatically.
 
 [![Plugin Validation](https://github.com/YOUR_USERNAME/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/YOUR_USERNAME/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
 
@@ -86,8 +88,8 @@ agent:
   reports_output_dir: "qa-reports"
 
 test_data:
-  email_domain: "qa.local"
-  use_uuid: true
+  email_domain: "qa.local"  # domain used for generated test emails
+  use_uuid: true             # prepend random UUID to email addresses (avoids conflicts on re-run)
 ```
 
 ---
@@ -106,7 +108,7 @@ test_data:
 
 ### Auto-invocation via orchestrator
 
-If you use [superpowers](https://github.com/obra/superpowers) and `subagent-driven-development`, the `qa-flutter:qa-stability-agent` agent triggers automatically when an implementation phase completes. No manual invocation needed.
+If you use [superpowers](https://github.com/obra/superpowers) — a Claude Code plugin that orchestrates multi-task implementation plans — the `qa-flutter:qa-stability-agent` agent triggers automatically when an implementation phase completes. It reads your `qa-agent.yaml`, detects the platform, and runs the correct QA runner. No manual invocation needed.
 
 ---
 
