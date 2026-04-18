@@ -26,7 +26,7 @@
 1. Fork the repository
 2. Create a branch: `feat/your-runner-name` or `fix/issue-description`
 3. Make your changes
-4. Verify no hardcoded paths: `grep -rn "C:/\|D:/" skills/ agents/`
+4. Verify no hardcoded paths: `grep -rEn "[A-Z]:[/\\\\]" skills/ agents/`
 5. Open a PR describing which skill or agent you changed and why
 
 ## Reporting bugs
