@@ -43,7 +43,7 @@ Manual installation. Three skills (Android runner, Android tester, Web runner) +
 
 **Example usage in CI:**
 ```yaml
-- uses: YOUR_USERNAME/qa-flutter-plugin@v3
+- uses: jrperez2015/qa-flutter-plugin@v3
   with:
     platform: web
     flutter-path: .

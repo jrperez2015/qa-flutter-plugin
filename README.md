@@ -6,7 +6,7 @@ For **Android** projects, it runs Appium UI tests against your app and generates
 
 One orchestrator agent auto-detects your platform from `qa-agent.yaml` and routes to the correct runner skill automatically.
 
-[![Plugin Validation](https://github.com/YOUR_USERNAME/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/YOUR_USERNAME/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
+[![Plugin Validation](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
 
 ---
 
@@ -25,7 +25,7 @@ One orchestrator agent auto-detects your platform from `qa-agent.yaml` and route
 
 ```bash
 # 1. Clone to your Claude Code plugins directory
-git clone https://github.com/YOUR_USERNAME/qa-flutter-plugin \
+git clone https://github.com/jrperez2015/qa-flutter-plugin \
   "$HOME/.claude/plugins/local/qa-flutter"
 ```
 
