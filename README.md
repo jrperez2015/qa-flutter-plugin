@@ -23,27 +23,126 @@ One orchestrator agent auto-detects your platform from `qa-agent.yaml` and route
 
 ### Manual (v1)
 
-```bash
-# 1. Clone to your Claude Code plugins directory
-git clone https://github.com/jrperez2015/qa-flutter-plugin \
-  "$HOME/.claude/plugins/local/qa-flutter"
+Estos pasos instalan el plugin `qa-flutter` (que contiene los skills `qa-flutter-android-runner`, `qa-flutter-android-tester`, `qa-flutter-web-runner`) en Claude Code como plugin de usuario.
+
+> **Por qué estos pasos:** Claude Code no permite instalar plugins directamente desde una ruta de archivo. Requiere un "marketplace" registrado. Los pasos 2-4 crean y registran un marketplace local que apunta a la carpeta donde vive el plugin.
+
+**Paso 1 — Copiar los archivos del plugin**
+
+Copiar el contenido de `qa-flutter-plugin/` al directorio de plugins locales de Claude Code:
+
+```
+C:\Users\<usuario>\.claude\plugins\local\qa-flutter\
+├── .claude-plugin\
+│   └── plugin.json
+├── agents\
+│   └── qa-stability-agent.md
+├── skills\
+│   ├── qa-flutter-android-runner\
+│   │   └── SKILL.md
+│   ├── qa-flutter-android-tester\
+│   │   └── SKILL.md
+│   └── qa-flutter-web-runner\
+│       └── SKILL.md
+└── README.md
 ```
 
-Then add this entry to `~/.claude/plugins/installed_plugins.json` inside the `"plugins"` object:
+Si la carpeta `~/.claude/plugins/local/` no existe, crearla manualmente.
+
+**Paso 2 — Crear el manifiesto del marketplace local**
+
+Crear el archivo `C:\Users\<usuario>\.claude\plugins\local\.claude-plugin\marketplace.json` con este contenido:
 
 ```json
-"qa-flutter@local": [
-  {
-    "scope": "user",
-    "installPath": "/absolute/path/to/.claude/plugins/local/qa-flutter",
-    "version": "1.0.0",
-    "installedAt": "2026-01-01T00:00:00.000Z",
-    "lastUpdated": "2026-01-01T00:00:00.000Z"
-  }
-]
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "local",
+  "description": "Local plugins for this user's Claude Code installation",
+  "owner": {
+    "name": "<Tu nombre>",
+    "email": "<tu-email>"
+  },
+  "plugins": [
+    {
+      "name": "qa-flutter",
+      "description": "QA stability agents and runners for Flutter Android and Flutter web projects",
+      "author": {
+        "name": "<Tu nombre>",
+        "email": "<tu-email>"
+      },
+      "source": "./qa-flutter",
+      "category": "development"
+    }
+  ]
+}
 ```
 
-Replace `installPath` with the actual path on your machine.
+> **Nota:** El campo `"source": "./qa-flutter"` es una ruta relativa al directorio del marketplace (es decir, `~/.claude/plugins/local/qa-flutter/`).
+
+**Paso 3 — Registrar el marketplace en Claude Code**
+
+```bash
+claude plugin marketplace add "C:/Users/<usuario>/.claude/plugins/local"
+```
+
+Resultado esperado:
+```
+✔ Successfully added marketplace: local (declared in user settings)
+```
+
+**Paso 4 — Instalar el plugin desde el marketplace local**
+
+```bash
+claude plugin install qa-flutter@local
+```
+
+Resultado esperado:
+```
+✔ Successfully installed plugin: qa-flutter@local (scope: user)
+```
+
+**Paso 5 — Verificar la instalación**
+
+```bash
+claude plugin list
+```
+
+Resultado esperado:
+```
+❯ qa-flutter@local
+    Version: 1.0.0
+    Scope: user
+    Status: ✔ enabled
+```
+
+Si el status muestra `✘ failed to load`, revisar que el `marketplace.json` del paso 2 existe y que la carpeta `qa-flutter/` tiene la estructura correcta.
+
+**Paso 6 — Reiniciar Claude Code**
+
+Cerrar y volver a abrir Claude Code. Los skills aparecerán en el system prompt como:
+
+```
+- qa-flutter:qa-flutter-android-runner
+- qa-flutter:qa-flutter-android-tester
+- qa-flutter:qa-flutter-web-runner
+```
+
+---
+
+### Errores frecuentes de instalación
+
+**`Plugin qa-flutter not found in marketplace local`**
+→ El plugin fue añadido directamente a `installed_plugins.json` sin registrar el marketplace. Ejecutar `claude plugin uninstall qa-flutter` y repetir desde el paso 3.
+
+**`Marketplace file not found at .../.claude-plugin/marketplace.json`**
+→ El archivo del paso 2 no existe o está en la ruta incorrecta. Verificar que está en `~/.claude/plugins/local/.claude-plugin/marketplace.json`.
+
+**`failed to load` después de instalar correctamente**
+→ Claude Code no ha recargado la lista de plugins. Reiniciar Claude Code (paso 6).
+
+---
+
+
 
 ### Via Plugin Manager (v2 — coming soon)
 
