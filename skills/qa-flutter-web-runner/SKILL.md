@@ -1,6 +1,6 @@
 ---
 name: qa-flutter-web-runner
-description: Use when validating stability of a Flutter web app after implementation changes. Runs flutter analyze, flutter test, flutter build web, analyzes git diff, and generates a functional test checklist.
+description: Use when validating a Flutter web app's stability after implementation changes, or when a post-implementation QA checklist is needed for a web build. Produces a manual test checklist scoped to the files touched by the recent git diff. NOT for Android — use qa-flutter-android-runner or qa-flutter-manual-runner. NOT for unit/widget test generation — use qa-flutter-unit-generator.
 argument-hint: "<objective or 'stability-check'>"
 ---
 
@@ -14,10 +14,13 @@ OR delegated automatically by `qa-stability-agent` when `project.platform` is `"
 
 ## Configuration
 
-Set these values to match your project:
+Resolve `CONFIG_PATH` at runtime — **never hardcode**:
 
-- `CONFIG_PATH`: absolute path to your `qa-agent.yaml`
-- `QA_AGENT_DIR`: absolute path to your `qa-agent/` directory
+1. Check `./qa-agent.yaml` in the current working directory.
+2. If absent, walk up from cwd looking for a `pubspec.yaml` sibling, then look for `qa-agent.yaml` there.
+3. If still not found, ask: `"¿Cuál es la ruta absoluta al archivo qa-agent.yaml?"`.
+
+`QA_AGENT_DIR` = directory containing the resolved `CONFIG_PATH`. Reports are written under `{QA_AGENT_DIR}/{reports_output_dir}`.
 
 Expected `qa-agent.yaml` fields for web mode:
 ```yaml
@@ -38,21 +41,15 @@ agent:
 
 ### Step 1: Read configuration
 
-If CONFIG_PATH has not been set, ask the user:
-> "What is the absolute path to your qa-agent.yaml?"
-Store as CONFIG_PATH. Also ask:
-> "What is the absolute path to your qa-agent/ directory?"
-Store as QA_AGENT_DIR.
-
 Use the Read tool to read CONFIG_PATH. Extract:
 - `project.flutter.path`
 - `project.auth` (entire block — may be absent)
 - `project.web.base_url`
 - `agent.reports_output_dir`
 
-**Path check:** If `project.flutter.path` is empty or not set, ask:
-> "What is the absolute path to your Flutter web project?"
-Store as `FLUTTER_PATH`. Do NOT modify the yaml.
+**Placeholder check:** If `project.flutter.path` contains "REEMPLAZAR" or is empty, ask:
+> "¿Cuál es la ruta absoluta al proyecto Flutter web?"
+Wait for response. Store as `FLUTTER_PATH`. Do NOT modify the yaml.
 
 If `project.web.base_url` is absent, default to `http://localhost:8080`.
 
@@ -208,3 +205,22 @@ Checklist: {QA_AGENT_DIR}/{reports_output_dir}/{timestamp}-web-checklist.md
 Build: {BUILD_RESULT} | Tests: {TESTS_RESULT} | Analysis: {ANALYSIS_RESULT}
 Impacted areas: {count} — {comma-separated list}
 ```
+
+---
+
+## When NOT to use
+
+- The project targets Android — use `qa-flutter-android-runner` or `qa-flutter-manual-runner`.
+- You need to run automated browser tests (Playwright, Cypress) — this skill produces a manual checklist, not automation.
+- You need to generate unit or widget tests — use `qa-flutter-unit-generator`.
+- The `git diff` scope is too large (massive refactor) — the impacted-areas heuristic becomes noisy. Generate the checklist manually or scope the diff to a specific commit range.
+
+## Common mistakes
+
+| Mistake | Fix |
+|---|---|
+| Running without committing first | `git diff HEAD~1` needs at least one prior commit on the branch. Commit staged work first. |
+| Ignoring `ANALYSIS_FAILED` and proceeding | Warnings are OK; `error •` is not. Fix before asking QA to manually test. |
+| Generating the checklist but not running the build | `BUILD_FAILED` means the checklist is moot. Always fix the build first. |
+| Checklist too generic per area | The mapping in Step 6 is rules-based; tune it for your project by editing the area → test-cases table inline. |
+| Re-running the same checklist after small edits | Each run should correspond to a specific commit range. Don't mix diffs across multiple implementation rounds. |

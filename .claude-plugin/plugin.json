@@ -1,10 +1,20 @@
 {
   "name": "qa-flutter",
-  "description": "QA stability agents and runners for Flutter Android and Flutter web projects",
-  "version": "1.0.0",
+  "description": "QA orchestration for Flutter — full testing pyramid (unit/widget/state → integration/E2E → stability → release gate) with autonomous lifecycle (backend bootstrap, device boot, tests, teardown) for Android (flutter_drive default, Appium opt-in) and Web.",
+  "version": "1.1.0",
   "author": {
     "name": "José Rolando Pérez Sandó",
     "email": "jrperez2015@gmail.com"
   },
-  "keywords": ["qa", "flutter", "android", "web", "stability"]
+  "keywords": [
+    "qa",
+    "flutter",
+    "android",
+    "web",
+    "stability",
+    "release-gate",
+    "autonomous",
+    "integration-testing",
+    "claude-code"
+  ]
 }

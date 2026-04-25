@@ -1,75 +1,38 @@
-# qa-flutter — Claude Code Plugin
-
-QA stability plugin for Flutter projects (Android + Web).
-
-For **Android** projects, it runs Appium UI tests against your app and generates per-feature Markdown reports. For **Flutter web** projects, it runs `flutter analyze`, `flutter test`, and `flutter build web`, analyzes the git diff, and produces a manual test checklist for the changed areas.
-
-One orchestrator agent auto-detects your platform from `qa-agent.yaml` and routes to the correct runner skill automatically.
+# qa-flutter
 
 [![Plugin Validation](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
 
----
-
-## Requirements
-
-- [Claude Code CLI](https://claude.ai/code)
-- A `qa-agent.yaml` file configured for your project (see [Configuration](#configuration))
-- **Android only:** Appium server running + Android emulator connected via ADB
-- **Web only:** Flutter SDK with web support enabled
-
----
+QA plugin for Flutter projects — covers the full testing pyramid (unit/widget/state → integration/E2E → stability) across Android and Web, with an **autonomous orchestrator** that brings up the backend, boots the device, runs tests, emits an actionable report + JSON artifact, and tears everything down. Designed as a pre-release stability gate.
 
 ## Installation
 
-### Manual (v1)
+The plugin is distributed as a Claude Code plugin via a local marketplace. Until public marketplaces land, the install path is:
 
-Estos pasos instalan el plugin `qa-flutter` (que contiene los skills `qa-flutter-android-runner`, `qa-flutter-android-tester`, `qa-flutter-web-runner`) en Claude Code como plugin de usuario.
+**1. Clone the repo into your Claude Code plugins directory:**
 
-> **Por qué estos pasos:** Claude Code no permite instalar plugins directamente desde una ruta de archivo. Requiere un "marketplace" registrado. Los pasos 2-4 crean y registran un marketplace local que apunta a la carpeta donde vive el plugin.
+```bash
+# Windows
+git clone https://github.com/jrperez2015/qa-flutter-plugin C:/Users/<user>/.claude/plugins/local/qa-flutter
 
-**Paso 1 — Copiar los archivos del plugin**
-
-Copiar el contenido de `qa-flutter-plugin/` al directorio de plugins locales de Claude Code:
-
-```
-C:\Users\<usuario>\.claude\plugins\local\qa-flutter\
-├── .claude-plugin\
-│   └── plugin.json
-├── agents\
-│   └── qa-stability-agent.md
-├── skills\
-│   ├── qa-flutter-android-runner\
-│   │   └── SKILL.md
-│   ├── qa-flutter-android-tester\
-│   │   └── SKILL.md
-│   └── qa-flutter-web-runner\
-│       └── SKILL.md
-└── README.md
+# macOS / Linux
+git clone https://github.com/jrperez2015/qa-flutter-plugin ~/.claude/plugins/local/qa-flutter
 ```
 
-Si la carpeta `~/.claude/plugins/local/` no existe, crearla manualmente.
-
-**Paso 2 — Crear el manifiesto del marketplace local**
-
-Crear el archivo `C:\Users\<usuario>\.claude\plugins\local\.claude-plugin\marketplace.json` con este contenido:
+**2. Create the local marketplace manifest** at `~/.claude/plugins/local/.claude-plugin/marketplace.json`:
 
 ```json
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "local",
-  "description": "Local plugins for this user's Claude Code installation",
-  "owner": {
-    "name": "<Tu nombre>",
-    "email": "<tu-email>"
-  },
+  "description": "Local plugins",
+  "owner": { "name": "<Your name>", "email": "<your-email>" },
   "plugins": [
     {
       "name": "qa-flutter",
-      "description": "QA stability agents and runners for Flutter Android and Flutter web projects",
-      "author": {
-        "name": "<Tu nombre>",
-        "email": "<tu-email>"
-      },
+      "description": "QA orchestration for Flutter with autonomous lifecycle",
+      "author": { "name": "<Your name>", "email": "<your-email>" },
       "source": "./qa-flutter",
       "category": "development"
     }
@@ -77,180 +40,520 @@ Crear el archivo `C:\Users\<usuario>\.claude\plugins\local\.claude-plugin\market
 }
 ```
 
-> **Nota:** El campo `"source": "./qa-flutter"` es una ruta relativa al directorio del marketplace (es decir, `~/.claude/plugins/local/qa-flutter/`).
-
-**Paso 3 — Registrar el marketplace en Claude Code**
+**3. Register and install:**
 
 ```bash
-claude plugin marketplace add "C:/Users/<usuario>/.claude/plugins/local"
-```
-
-Resultado esperado:
-```
-✔ Successfully added marketplace: local (declared in user settings)
-```
-
-**Paso 4 — Instalar el plugin desde el marketplace local**
-
-```bash
+claude plugin marketplace add "<path-to-local-marketplace-dir>"
 claude plugin install qa-flutter@local
+claude plugin list   # expect: qa-flutter@local  enabled
 ```
 
-Resultado esperado:
-```
-✔ Successfully installed plugin: qa-flutter@local (scope: user)
-```
+Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-flutter-manual-runner`, `qa-flutter:qa-flutter-release-gate`, etc.) appear in the system prompt.
 
-**Paso 5 — Verificar la instalación**
+**Updating:** `git pull` in the clone directory, then restart Claude Code. No re-install needed.
 
-```bash
-claude plugin list
-```
-
-Resultado esperado:
-```
-❯ qa-flutter@local
-    Version: 1.0.0
-    Scope: user
-    Status: ✔ enabled
-```
-
-Si el status muestra `✘ failed to load`, revisar que el `marketplace.json` del paso 2 existe y que la carpeta `qa-flutter/` tiene la estructura correcta.
-
-**Paso 6 — Reiniciar Claude Code**
-
-Cerrar y volver a abrir Claude Code. Los skills aparecerán en el system prompt como:
-
-```
-- qa-flutter:qa-flutter-android-runner
-- qa-flutter:qa-flutter-android-tester
-- qa-flutter:qa-flutter-web-runner
-```
+**Prerequisites:** see the [Prerequisites](#prerequisites) section below.
 
 ---
 
-### Errores frecuentes de instalación
+## Quick start
 
-**`Plugin qa-flutter not found in marketplace local`**
-→ El plugin fue añadido directamente a `installed_plugins.json` sin registrar el marketplace. Ejecutar `claude plugin uninstall qa-flutter` y repetir desde el paso 3.
+1. Install the plugin (copy `qa-flutter/` into `~/.claude/plugins/local/` or load via marketplace).
+2. Install prerequisites for your stack (see [Prerequisites](#prerequisites)).
+3. Create `qa-agent.yaml` at your project root (see [Configuration](#configuration--qa-agentyaml)).
+4. Run:
+   ```
+   /qa-unit <feature>    # unit + widget + state tests (fast, no device)
+   /qa-run  <feature>    # integration tests via flutter_drive
+   ```
+5. At end of branch, let the orchestrator auto-invoke `qa-stability-agent` for the final QA pass.
 
-**`Marketplace file not found at .../.claude-plugin/marketplace.json`**
-→ El archivo del paso 2 no existe o está en la ruta incorrecta. Verificar que está en `~/.claude/plugins/local/.claude-plugin/marketplace.json`.
+## Prerequisites
 
-**`failed to load` después de instalar correctamente**
-→ Claude Code no ha recargado la lista de plugins. Reiniciar Claude Code (paso 6).
+| Requirement | Needed by |
+|---|---|
+| Flutter SDK `^3.10.0` | All skills |
+| `adb` in PATH | Android skills |
+| Python 3 | Appium stack only |
+| Appium server + UiAutomator2 driver | Appium stack only |
+| Android emulator or physical device | Android E2E skills |
+| Chrome (for manual web QA) | Web runner |
+
+## Components
+
+### Agent
+
+| Component | Kind | How it runs |
+|---|---|---|
+| `qa-flutter:qa-stability-agent` | Sub-agent | Auto-delegated by Claude after implementation completes, or invoke explicitly with `@qa-stability-agent` |
+
+### Skills (slash commands)
+
+| Skill | Slash command | Layer | Mechanism | Platform |
+|---|---|---|---|---|
+| `qa-flutter-unit-generator` | `/qa-unit <feature>` | Unit / Widget / State | `flutter test` | Any |
+| `qa-flutter-manual-runner` | `/qa-run <feature>` | Integration / E2E | `flutter drive` + `integration_test` | Android |
+| `qa-flutter-android-runner` | `/qa-flutter-android-runner "<objective>"` | Integration / E2E | Appium + Python orchestrator | Android |
+| `qa-flutter-android-tester` | (sub-agent, not user-invoked) | Integration / E2E | Appium — single feature | Android |
+| `qa-flutter-web-runner` | `/qa-flutter-web-runner "<objective>"` | Stability + checklist | `flutter analyze/test/build web` + git diff | Web |
+| `qa-flutter-release-gate` | `/qa-release-gate [--threshold] [--version]` | Go/No-Go release gate | Wraps `qa-stability-agent` + severity classification | Any |
 
 ---
 
+## Using `qa-stability-agent`
 
+### What it does
 
-### Via Plugin Manager (v2 — coming soon)
+Entry point for **post-implementation QA**. Reads `qa-agent.yaml`, detects the platform and Android stack, then delegates to the correct runner skill. Optionally runs unit coverage after the main E2E pass.
+
+### When to use
+
+- After all tasks in an implementation plan are marked complete.
+- At a significant mid-plan checkpoint before continuing with remaining tasks.
+- Before merging a development branch (stability gate).
+
+### When NOT to use
+
+- **Mid-implementation** — partial code makes QA noisy.
+- **For code review** — use `superpowers:requesting-code-review` instead.
+- **Without `qa-agent.yaml`** — the agent needs it to route; it will ask the user for a path, but skipping the config is not recommended.
+
+### How to invoke
+
+**Auto-delegation** (default): Claude routes to this agent when the conversation signals implementation completion. Phrases that trigger it:
+
+- "Listo, todas las tareas completadas"
+- "Implementation done, ready for QA"
+- "All tasks done"
+- After `my-subagent-driven-development` finishes its plan
+
+**Explicit invocation** from the main session:
 
 ```
-/plugin install qa-flutter
+@qa-stability-agent
 ```
+
+Or ask Claude directly: `"Invoca qa-stability-agent para validar la rama"`.
+
+### Generic example — end-to-end
+
+**Scenario:** You just finished implementing a feature `password-recovery` using `my-subagent-driven-development`. All tasks are marked complete. You want to validate stability before opening a PR.
+
+**1. Ensure `qa-agent.yaml` exists:**
+```yaml
+project:
+  platform: "android"
+  android_stack: "flutter_drive"
+device:
+  id: emulator-5554
+  app_package: com.example.app
+backend:
+  test_url: "http://localhost:8080/api"
+reports:
+  output_dir: test/docs/QA_REPORTS
+post_run:
+  include_unit: true        # also run unit coverage
+```
+
+**2. Trigger the agent:**
+```
+user: "All tasks done, validar estabilidad"
+```
+
+**3. What happens internally:**
+1. Agent reads `qa-agent.yaml`.
+2. `platform=android`, `android_stack=flutter_drive` → routes to `qa-flutter-manual-runner` with objective `regresion`.
+3. Manual runner executes all tests in `integration_test/manual/*.dart` sequentially.
+4. `post_run.include_unit == true` → for each feature mentioned in the implementation summary (here, `password-recovery`), invokes `qa-flutter-unit-generator --auto`.
+5. Aggregates reports.
+
+**4. What the agent returns:**
+```
+Main QA report: test/docs/QA_REPORTS/2026-04-23T14-30-summary.md
+Unit reports:
+  - test/docs/QA_REPORTS/2026-04-23T14-42-password-recovery-unit.md
+Overall verdict: PASS
+```
+
+### Verdict semantics
+
+| Verdict | Meaning |
+|---|---|
+| `PASS` | All executed features passed; unit coverage meets target if run |
+| `PARCIAL` | Some tests failed or coverage below target — review the linked reports |
+| `FAIL` | Main runner aborted (bootstrap failure, device lost, build broken) |
+
+### Failure modes
+
+| Failure | Agent behavior |
+|---|---|
+| `qa-agent.yaml` not found | Asks for path; aborts if user doesn't provide |
+| Delegated skill aborts in pre-flight (backend down, device missing) | Returns the pre-flight error message verbatim; no retry |
+| Main runner passes, `post_run.include_unit` step fails | Returns main PASS + unit FAIL — does not override main verdict |
+| Ambiguous `project.platform` | Defaults to `android`; if `android_stack` also absent, defaults to `flutter_drive` |
+
+### Limitations
+
+- **Does not run in parallel** — features are tested sequentially.
+- **Does not retry failed runs** — a flaky test that fails once is recorded as fail.
+- **Does not verify backend data cleanup** — tests that create data (MUTANT-tagged) assume a test-profile backend handles isolation.
+- **Does not open PRs or merge** — pure QA gate; integration with git is manual.
+- **Does not cover golden tests** — pass `--golden` when invoking `qa-flutter-unit-generator` directly if you need visual regression.
 
 ---
 
-## Configuration
+## Stack default and trade-offs
 
-Create a `qa-agent.yaml` file in your QA workspace directory:
+**Default:** `flutter_drive` via `qa-flutter-manual-runner`.
+
+Why the default: fewer moving parts (no Python, no Appium server), faster feedback (30–90s per run vs 2–5min), Dart test code you can commit and refactor, access to the widget tree for assertions. Good enough for 80% of functional QA on Flutter apps.
+
+**Use Appium when you need any of:**
+- Native gestures beyond what the widget layer exposes (multi-touch with specific velocity, long-press at coordinates, system UI interactions).
+- Multi-app flows (permission dialogs, intents to other apps, deep links opened from Chrome).
+- Testing a pre-compiled APK (staging or release build) as a black box.
+- Portability to iOS at a later stage (Appium's protocol is cross-platform; `flutter_drive` tests require adaptation).
+
+Configure in `qa-agent.yaml`:
 
 ```yaml
 project:
-  platform: "web"          # "web" or "android"
+  platform: "android"
+  android_stack: "flutter_drive"   # or "appium". Default: flutter_drive.
+```
+
+Full decision matrix: [docs/android-stacks.md](docs/android-stacks.md).
+
+---
+
+## Typical flows
+
+### After a feature implementation (manual, during dev)
+```
+/qa-unit <feature>                → base + middle of pyramid
+/qa-run  <feature>                → top of pyramid (integration via flutter_drive)
+```
+
+### Post-branch stability checkpoint (automated)
+Either let Claude auto-delegate to `qa-stability-agent`, or invoke explicitly:
+```
+@qa-stability-agent
+```
+
+### Release gate — GO/NO-GO to production
+```
+/qa-release-gate --threshold=normal --version=v1.2.3
+```
+Emits a report classifying findings by severity (Critical/High/Medium/Low) and a binary verdict. See [Release gate](#release-gate) below for details and scheduling.
+
+### CI / unattended
+```bash
+claude -p "/qa-run regresion --auto" --output-format json
+claude -p "/qa-unit <feature> --auto"
+claude -p "/qa-release-gate --auto --threshold=strict" --output-format json
+```
+
+---
+
+## Configuration — `qa-agent.yaml`
+
+All components resolve this file at runtime by: (1) cwd, (2) walking up to find `pubspec.yaml`, (3) asking the user. **No hardcoded paths.**
+
+### Flutter web
+```yaml
+project:
+  platform: "web"
   flutter:
-    path: "/path/to/your/flutter/project"
-  backend:                 # Android only
-    path: "/path/to/your/backend"
-    start_command: "mvn spring-boot:run -Pdev"
-    health_check_url: "http://localhost:PORT/health"
-    ready_timeout_seconds: 60
-  auth:                    # Web only, optional (omit if unauthenticated)
-    email: "qa@example.com"
-    password: "secret"
+    path: <absolute path to Flutter project>
   web:
     base_url: "http://localhost:8080"
+  auth:                           # optional
+    email: qa@example.com
+    password: secret
+agent:
+  reports_output_dir: qa-reports
+```
 
-appium:                    # Android only
-  server_url: "http://localhost:4723"
-  device_name: "emulator-5554"
-  app_package: "com.example.yourapp"
-  app_activity: ".MainActivity"
-  step_retry_attempts: 3
-  step_retry_wait_seconds: 2
+### Android — flutter_drive stack (recommended default)
+```yaml
+project:
+  platform: "android"
+  android_stack: "flutter_drive"
+device:
+  id: emulator-5554
+  app_package: com.example.app
+timeouts:
+  test_seconds: 120
+  adb_retry_count: 2
+  adb_retry_wait_seconds: 3
+execution:
+  reset_app_before_each: true
+backend:
+  test_url: "http://localhost:8080/api"
+reports:
+  output_dir: test/docs/QA_REPORTS
+unit:                             # optional — for unit-generator
+  test_root: test
+  coverage_target: 80
+```
 
+Plus `.env` at the Flutter project root:
+```
+TEST_EMAIL=qa-user@test.com
+TEST_PASSWORD=your-test-password
+API_BASE_URL=http://localhost:8080/api
+```
+`API_BASE_URL` must contain `backend.test_url` (pre-flight rejects mismatches to protect prod data).
+
+### Android — Appium stack
+```yaml
+project:
+  platform: "android"
+  android_stack: "appium"
+  backend:
+    path: <absolute path to backend repo>
+  flutter:
+    path: <absolute path to Flutter project>
+appium:
+  device_name: emulator-5554
+  app_package: com.example.app
 agent:
   max_features_per_run: 5
-  agent_max_execution_seconds: 120
-  feature_timeout_seconds: 90
-  reports_output_dir: "qa-reports"
-
+  agent_max_execution_seconds: 600
+  feature_timeout_seconds: 180
+  reports_output_dir: qa-reports
 test_data:
-  email_domain: "qa.local"  # domain used for generated test emails
-  use_uuid: true             # prepend random UUID to email addresses (avoids conflicts on re-run)
+  email_domain: test.com
+  use_uuid: true
+```
+
+Requires a companion `qa-agent/` directory next to the yaml with `scripts/bootstrap.py`, `scripts/teardown.py`, `scripts/appium_runner.py`.
+
+### Optional — post-run unit coverage after stability
+```yaml
+post_run:
+  include_unit: true
+```
+When `true`, `qa-stability-agent` runs `qa-flutter-unit-generator` for each feature after the main E2E pass.
+
+---
+
+## Release gate
+
+`qa-flutter-release-gate` is a **go/no-go production gate**. It wraps `qa-stability-agent`, classifies every finding by production impact, and emits a binary verdict.
+
+### Severity buckets
+
+| Bucket | Examples | Blocks GO |
+|---|---|---|
+| 🔴 Critical | Login/payment E2E fail, compile error, crash on boot, analyzer `error •` | Always |
+| 🟠 High | Secondary E2E fail, timeout, coverage below floor for critical feature | In `strict` and `normal` profiles |
+| 🟡 Medium | Unit PARCIAL on non-critical classes, coverage well below target | Only in `strict` if >2 |
+| 🔵 Low | Analyzer warnings, minor flakiness, single token retry | Never |
+
+Full rules in [qa-flutter-release-gate/references/severity-rules.md](skills/qa-flutter-release-gate/references/severity-rules.md).
+
+### Threshold profiles
+
+| Profile | GO if |
+|---|---|
+| `strict` | 0 Critical, 0 High, ≤2 Medium |
+| `normal` (default) | 0 Critical, 0 High |
+| `lenient` | 0 Critical |
+
+### Gate config in `qa-agent.yaml`
+
+```yaml
+release_gate:
+  threshold: "normal"                   # strict | normal | lenient
+  critical_features:                    # E2E fail on these → Critical
+    - "login"
+    - "payment"
+    - "checkout"
+  coverage_floor: 70                    # min coverage for critical features (%)
+  waivers:                              # temporary High-downgrades
+    - finding_id: "login-e2e-step-3"
+      reason: "Flaky network in CI — TICKET-123"
+      expires: "2026-05-31"
+```
+
+### Scheduling (autonomous routine)
+
+Three supported patterns:
+
+**A) Scheduled via `anthropic-skills:schedule`** — cron within Claude:
+```
+user: schedule '/qa-release-gate --auto --threshold=normal' every day at 03:00
+```
+
+**B) External CI** — GitHub Actions, Task Scheduler, cron:
+```bash
+claude -p "/qa-release-gate --auto --threshold=strict --version=${VERSION}" \
+  --output-format json
+```
+Read `RELEASE_GATE_EXIT` from output; fail the job if non-zero.
+
+**C) Pre-release manual** — invoked by an engineer before tagging:
+```
+/qa-release-gate --version=v1.2.3
+```
+
+### Gate report output
+
+Written to `{reports_output_dir}/release-gate-{version}-{timestamp}.md`. Includes: verdict, counts per severity, full list of Critical+High findings with links to underlying reports, waivers applied, prioritized action list, exit code.
+
+Example verdict line in the report header:
+```
+**Fecha:** 2026-04-23T03-00 | **Threshold:** normal | **Veredicto:** 🔴 NO-GO
 ```
 
 ---
 
-## Usage
+## Autonomous execution
 
-### Manual invocation
+Since the release that introduces `qa-flutter-bootstrap`, the release gate runs end-to-end without manual infrastructure setup — bringing up the backend, verifying the device, running tests, emitting the report, and tearing everything down. This is the intended path for nightly CI and pre-release gates.
+
+### Enable it
+
+Add an `autonomous` block to your `qa-agent.yaml`:
+
+```yaml
+autonomous:
+  backend:
+    start_cmd: "./gradlew bootRun --args='--spring.profiles.active=test'"
+    start_cwd: "../transfer_rest_api"         # relative to this yaml's directory
+    health_url: "http://localhost:8080/api/health"
+    ready_timeout_seconds: 120                # optional, default 120
+    stop_cmd: "pkill -f 'gradlew bootRun'"    # optional; kill by pid is fallback
+    stop_timeout_seconds: 30                  # optional, default 30
+  device:
+    boot_avd: "Pixel_5_API_33"                # exact AVD name (must exist; skill does not create)
+    boot_timeout_seconds: 90                  # optional, default 90
+```
+
+Leave out any sub-block that doesn't apply (e.g. web projects omit `device`).
+
+### Invoke
+
+On-demand (manual or CI):
+```
+claude -p "/qa-release-gate --auto --threshold=normal" --output-format json
+```
+
+Scheduled (via `anthropic-skills:schedule`):
+```
+user: schedule '/qa-release-gate --auto --threshold=strict' every day at 03:00
+```
+
+Either way, the gate handles lifecycle. See [docs/references/appium-bootstrap-contract.md](docs/references/appium-bootstrap-contract.md) if you use the Appium stack (you must update your `scripts/bootstrap.py` to the v1 contract).
+
+### Recovery
+
+If a run crashes hard (SIGKILL or machine power loss), a stale marker may remain at `<reports-dir>/.qa-bootstrap-marker`. Recover with:
+
+```bash
+claude -p "invoke the qa-flutter-bootstrap skill with --down"
+```
+
+The skill is idempotent — it tears down only what the marker says was started, and handles dead PIDs gracefully.
+
+### Gap status
+
+| Gap | Status |
+|---|---|
+| G1 — Backend bootstrap (flutter_drive) | ✅ Implemented via `qa-flutter-bootstrap` |
+| G2 — Device bootstrap config | ✅ Implemented via `autonomous.device.boot_avd` |
+| G4 — JSON artifact alongside markdown | ✅ Implemented (schema v1.0) |
+| G6 — Scheduled-run idempotency (lock) | ✅ Implemented via marker file |
+| G3 — Notifications on NO-GO | ⚠ Out of plugin scope — handle via CI notification step |
+| G5 — Waiver approval workflow | ⏳ Future |
+| G7 — Cost tracking per run | ⏳ Future |
+
+---
+
+## Reports
+
+### Location
+
+| Skill | Report path |
+|---|---|
+| `qa-flutter-manual-runner` | `test/docs/QA_REPORTS/{timestamp}-{feature}.md` |
+| `qa-flutter-unit-generator` | `{reports.output_dir}/{timestamp}-{feature}-unit.md` |
+| `qa-flutter-android-runner` | `{qa-agent-dir}/{reports_output_dir}/{timestamp}-{feature}.md` |
+| `qa-flutter-web-runner` | `{qa-agent-dir}/{reports_output_dir}/{timestamp}-web-checklist.md` |
+
+All suite runs also produce a `{timestamp}-summary.md` aggregating per-feature reports.
+
+### Report skeleton (integration)
+
+```markdown
+# QA Report — Feature: login
+**Fecha:** 2026-04-23T14-30 | **Duración:** 47s | **Resultado:** ✅ PASS
+**App:** my_flutter_app v1.2.3 | **Dispositivo:** emulator-5554
+**Modo:** regresion individual
+
+## Objetivo
+Verifies the login happy path and one validation-error case.
+
+## Pasos ejecutados
+| # | Descripción | Resultado | Duración |
+|---|-------------|-----------|----------|
+| 1 | Navigate to login | ✅ PASS | 2s |
+| 2 | Enter valid credentials | ✅ PASS | 1s |
+| 3 | Tap submit | ✅ PASS | 3s |
+| 4 | Assert home screen | ✅ PASS | 2s |
+
+## Pendientes para corrección
+Sin pendientes.
+```
+
+---
+
+## File layout
 
 ```
-# Android — test specific features
-/qa-flutter-android-runner "test login and signup flow"
-
-# Web — stability check after implementation changes
-/qa-flutter-web-runner stability-check
+qa-flutter/
+  .claude-plugin/plugin.json
+  agents/
+    qa-stability-agent.md
+  skills/
+    qa-flutter-unit-generator/
+      SKILL.md
+      references/                   ← layer templates
+    qa-flutter-manual-runner/
+    qa-flutter-android-runner/
+    qa-flutter-android-tester/
+    qa-flutter-web-runner/
+  docs/
+    android-stacks.md               ← decision matrix
+  README.md                         ← this file
 ```
 
-### Auto-invocation via orchestrator
+## Migration guide — Appium users
 
-If you use [superpowers](https://github.com/obra/superpowers) — a Claude Code plugin that orchestrates multi-task implementation plans — the `qa-flutter:qa-stability-agent` agent triggers automatically when an implementation phase completes. It reads your `qa-agent.yaml`, detects the platform, and runs the correct QA runner. No manual invocation needed.
+If you already use the Appium stack (`project.android_stack: "appium"`), the release that introduces `qa-flutter-bootstrap` changes how your companion scripts are invoked.
 
----
+**What changed:**
+- `qa-flutter-android-runner` no longer invokes `python scripts/bootstrap.py` directly. It invokes `qa-flutter-bootstrap --up --caller=android-runner`, which in turn delegates to your `scripts/bootstrap.py` passing a new `--marker=<path>` flag.
+- Your `bootstrap.py` and `teardown.py` must accept `--marker` and write/respect a marker file per the [v1 contract](docs/references/appium-bootstrap-contract.md).
 
-## What each skill does
+**Migration steps:**
+1. Read the [contract doc](docs/references/appium-bootstrap-contract.md).
+2. Update `scripts/bootstrap.py` to accept `--marker` and write the marker YAML atomically.
+3. Update `scripts/teardown.py` to accept `--marker`, read it, clean up, and delete it on success.
+4. Update your `qa-agent.yaml` to use the unified `autonomous.*` block (previously you may have had `backend_endpoint`, `appium.boot`, etc. in custom fields).
+5. Test end-to-end with: `claude -p "/qa-release-gate --auto"`.
 
-| Skill | Platform | Output |
-|-------|----------|--------|
-| `qa-flutter-android-runner` | Android | Runs Appium tests, generates per-feature Markdown reports + summary |
-| `qa-flutter-android-tester` | Android | Tests a single feature (sub-agent, do not invoke directly) |
-| `qa-flutter-web-runner` | Web | Runs `flutter analyze`, `flutter test`, `flutter build web`, git diff analysis — generates a manual test checklist |
-
----
-
-## Extensions
-
-### Short-term (current architecture supports these)
-
-- **New platform runners** — create `skills/qa-flutter-<platform>-runner/SKILL.md` following the existing runner pattern, then register it in `agents/qa-stability-agent.md`
-- **Custom report formats** — modify the report template in `qa-flutter-android-tester` or `qa-flutter-web-runner`
-- **Webhook notifications** — add a Step 8 to any runner that POSTs the summary to a Slack webhook or email service
-- **Per-project config override** — extend the Configuration section to support a `.qa-flutter.yaml` project-local override file
-
-### Long-term (requires architectural changes)
-
-- **iOS runner** — XCUITest-based runner analogous to the Android runner; requires a new `qa-flutter-ios-tester` skill and iOS-capable bootstrap script
-- **CI/CD integration** — GitHub Actions step that invokes the web runner headlessly and attaches the checklist as a PR artifact
-- **Report history dashboard** — a web UI that reads the `qa-reports/` directory and visualizes trends across runs
-- **Multi-project orchestration** — a coordinator agent that runs stability checks across multiple projects in sequence
+**During the deprecation window (current minor release):** if your scripts ignore `--marker`, the plugin falls back to the legacy `bootstrap-status.json` method and synthesizes a minimal marker. A deprecation warning is printed. At the next minor release, this fallback is removed and Appium runs will fail unless your scripts are updated.
 
 ---
 
-## Roadmap
+## Troubleshooting
 
-See [ROADMAP.md](ROADMAP.md) for the versioned plan toward marketplace distribution and extended platform support.
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Agent replies "¿Cuál es la ruta absoluta al archivo qa-agent.yaml?" | yaml not found in cwd or parent | Create the yaml at project root, or answer with absolute path |
+| "Backend no disponible" pre-flight error | Test backend not running, or `API_BASE_URL` mismatch | Start test backend; verify `.env` matches `backend.test_url` |
+| "No hay dispositivos ADB ni AVDs disponibles" | No emulator running and no AVD to launch | Start an emulator manually or create an AVD in Android Studio |
+| Tests pass locally but fail in CI | Flaky timing, screen size, or device state | Check report — look for `TOKEN_RETRY` notes or missing `pumpAndSettle` |
+| `BUILD_FAILED` in web runner | Compile errors in Flutter web target | Run `flutter build web` manually and fix before re-running QA |

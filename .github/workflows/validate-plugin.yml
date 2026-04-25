@@ -16,55 +16,55 @@ jobs:
         run: |
           node -e "
             const p = require('./.claude-plugin/plugin.json');
-            const required = ['name', 'description', 'author'];
+            const required = ['name', 'description', 'version', 'author'];
             const missing = required.filter(f => !p[f]);
             if (missing.length) { console.error('plugin.json missing:', missing); process.exit(1); }
-            console.log('plugin.json OK');
+            if (!/^\d+\.\d+\.\d+/.test(p.version)) { console.error('plugin.json version not semver:', p.version); process.exit(1); }
+            console.log('plugin.json OK (v' + p.version + ')');
           "
 
       - name: Check SKILL.md frontmatter in all skills
         run: |
+          fail=0
           for dir in skills/*/; do
-            file="$dir/SKILL.md"
+            file="${dir}SKILL.md"
             if [ ! -f "$file" ]; then
-              echo "MISSING: $file"
-              exit 1
+              echo "MISSING: $file"; fail=1; continue
             fi
             if ! head -1 "$file" | grep -q "^---"; then
-              echo "MISSING frontmatter in: $file"
-              exit 1
+              echo "MISSING frontmatter in: $file"; fail=1
             fi
             if ! grep -q "^name:" "$file"; then
-              echo "MISSING 'name:' in: $file"
-              exit 1
+              echo "MISSING 'name:' in: $file"; fail=1
             fi
             if ! grep -q "^description:" "$file"; then
-              echo "MISSING 'description:' in: $file"
-              exit 1
+              echo "MISSING 'description:' in: $file"; fail=1
             fi
             echo "OK: $file"
           done
+          exit $fail
 
       - name: Check agent frontmatter
         run: |
+          fail=0
           for file in agents/*.md; do
             if ! head -1 "$file" | grep -q "^---"; then
-              echo "MISSING frontmatter in: $file"
-              exit 1
+              echo "MISSING frontmatter in: $file"; fail=1
             fi
             if ! grep -q "^name:" "$file"; then
-              echo "MISSING 'name:' in: $file"
-              exit 1
+              echo "MISSING 'name:' in: $file"; fail=1
             fi
             if ! grep -q "^model:" "$file"; then
-              echo "MISSING 'model:' in: $file"
-              exit 1
+              echo "MISSING 'model:' in: $file"; fail=1
             fi
             echo "OK: $file"
           done
+          exit $fail
 
-      - name: Check for hardcoded absolute paths
+      - name: Check for hardcoded absolute paths in skills + agents
         run: |
+          # docs/ is exempt — the session retrospective intentionally references
+          # the reference project paths used during v1.1 implementation.
           if grep -rEn "[A-Z]:[/\\]" skills/ agents/ 2>/dev/null; then
             echo "ERROR: hardcoded Windows absolute paths found (see above)"
             exit 1
@@ -74,3 +74,12 @@ jobs:
             exit 1
           fi
           echo "No hardcoded paths found. OK."
+
+      - name: Check CHANGELOG mentions current version
+        run: |
+          VERSION=$(node -e "console.log(require('./.claude-plugin/plugin.json').version)")
+          if ! grep -q "\[$VERSION\]" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md does not mention version [$VERSION]"
+            exit 1
+          fi
+          echo "CHANGELOG mentions [$VERSION]. OK."

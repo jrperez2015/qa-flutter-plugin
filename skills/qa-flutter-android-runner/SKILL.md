@@ -1,6 +1,6 @@
 ---
 name: qa-flutter-android-runner
-description: Use when running QA tests against a Flutter Android app using Appium. Orchestrates bootstrap, feature test dispatch via qa-flutter-android-tester, and teardown.
+description: Use when running full QA suite on a Flutter Android app that uses the Appium stack (qa-agent.yaml with appium.device_name, backend Python scripts). Requires the qa-agent/ companion directory with bootstrap.py and teardown.py. NOT for flutter_drive-based testing — use qa-flutter-manual-runner. NOT for unit/widget tests — use qa-flutter-unit-generator. NOT for Flutter web — use qa-flutter-web-runner.
 argument-hint: "<test objective>"
 ---
 
@@ -14,22 +14,19 @@ Example: `/qa-flutter-android-runner "test el flujo de registro y login de usuar
 
 ## Configuration
 
-Before running, set these two values to match your project:
+Resolve `CONFIG_PATH` at runtime — **never hardcode**:
 
-- `CONFIG_PATH`: absolute path to your `qa-agent.yaml` file
-- `QA_AGENT_DIR`: absolute path to your `qa-agent/` directory (the one containing `scripts/`)
+1. Check `./qa-agent.yaml` in the current working directory.
+2. If absent, walk up from cwd looking for a `pubspec.yaml` sibling, then look for `qa-agent.yaml` there.
+3. If still not found, ask the user: `"¿Cuál es la ruta absoluta al archivo qa-agent.yaml?"`.
 
-The skill will prompt for these values at runtime if not configured.
+`QA_AGENT_DIR` = directory containing the resolved `CONFIG_PATH`.
+
+Under `QA_AGENT_DIR` there must exist `scripts/bootstrap.py` and `scripts/teardown.py` for the Appium stack. If missing → abort with instructions to install the qa-agent companion.
 
 ## Execution — follow every step in order
 
 ### Step 1: Read configuration
-
-If CONFIG_PATH has not been set, ask the user:
-> "What is the absolute path to your qa-agent.yaml?"
-Store as CONFIG_PATH. Also ask:
-> "What is the absolute path to your qa-agent/ directory (containing scripts/)?"
-Store as QA_AGENT_DIR.
 
 Use the Read tool to read CONFIG_PATH. Extract:
 - `agent.max_features_per_run`
@@ -38,34 +35,34 @@ Use the Read tool to read CONFIG_PATH. Extract:
 - `project.backend.path`
 - `project.flutter.path`
 
-**Path check:** If `project.backend.path` is empty or not set, ask the user:
-> "What is the absolute path to your backend project?"
-Store as `BACKEND_PATH`.
+**Placeholder check:** If `project.backend.path` contains "REEMPLAZAR" or is empty, ask the user:
+> "¿Cuál es la ruta absoluta al proyecto backend (transfer_rest_api)?"
+Wait for the response and store it as `BACKEND_PATH`.
 
-If `project.flutter.path` is empty or not set, ask the user:
-> "What is the absolute path to your Flutter project?"
-Store as `FLUTTER_PATH`.
+If `project.flutter.path` contains "REEMPLAZAR" or is empty, ask the user:
+> "¿Cuál es la ruta absoluta al proyecto Flutter?"
+Wait for the response and store it as `FLUTTER_PATH`.
 
 These values are used in memory for this run only — the yaml file is NOT modified.
 
 ### Step 2: Bootstrap — start services
 
-Use TaskCreate to create a task "Bootstrap services" and mark it in_progress.
+Use TaskCreate (or equivalent) to create a task "Bootstrap services" and mark it in_progress.
 
-Run via Bash:
-```
-cd {QA_AGENT_DIR} && python scripts/bootstrap.py qa-agent.yaml
-```
+Invoke the `qa-flutter-bootstrap` skill via the Skill tool with args: `--up --caller=android-runner`.
 
-Read `{QA_AGENT_DIR}/{reports_output_dir}/bootstrap-status.json`.
+Parse stdout:
+- `QA_BOOTSTRAP_STATUS=UP` → bootstrap successful. Read `QA_BOOTSTRAP_MARKER` path; parse the marker YAML; extract `device.id` as `APPIUM_DEVICE_ID` for downstream use. Mark task completed. Continue to Step 3.
+- `QA_BOOTSTRAP_STATUS=ALREADY_UP_BY={caller}` → another skill owns lifecycle. Read the existing marker; extract `device.id` same way. Mark task completed. Continue to Step 3.
+- Anything else → abort:
+  - Print the stderr/error from bootstrap.
+  - Print: "Bootstrap failed. Aborting test run. Check services and retry."
+  - Mark task completed with FAIL label.
+  - STOP. Do not dispatch sub-agents. Do not run Step 6 either (`--up` did not complete).
 
-If ANY of `api_ready`, `flutter_ready`, `appium_ready` is false:
-- Print the errors list
-- Print: "Bootstrap failed. Aborting test run. Check services and retry."
-- Mark bootstrap task completed.
-- STOP. Do not dispatch sub-agents.
+**Note:** `qa-flutter-bootstrap` internally detects `project.android_stack == "appium"` and delegates to `scripts/bootstrap.py` in the companion qa-agent directory. The contract that `bootstrap.py` must honor is documented in [docs/references/appium-bootstrap-contract.md](../../docs/references/appium-bootstrap-contract.md).
 
-Mark the bootstrap task completed.
+**Deprecated path:** Invoking `python scripts/bootstrap.py qa-agent.yaml` directly is still functional during the current minor release as a fallback — if the user's `bootstrap.py` does not yet support the `--marker` flag, `qa-flutter-bootstrap` will synthesize a marker from the legacy `bootstrap-status.json`. This fallback will be removed in the next minor release.
 
 ### Step 3: Parse test objective into feature list
 
@@ -136,10 +133,15 @@ Write `{QA_AGENT_DIR}/{reports_output_dir}/{timestamp}-summary.md`:
 
 ### Step 6: Teardown — stop services
 
-Run via Bash:
-```
-cd {QA_AGENT_DIR} && python scripts/teardown.py {reports_output_dir}
-```
+Invoke the `qa-flutter-bootstrap` skill via the Skill tool with args: `--down --caller=android-runner`.
+
+Parse stdout:
+- `QA_BOOTSTRAP_STATUS=DOWN` → OK.
+- `QA_BOOTSTRAP_STATUS=SKIPPED_NOT_OWNER=<owner>` → OK (composition — outer caller handles teardown).
+- `QA_BOOTSTRAP_STATUS=NO_MARKER` → OK (Step 2 did not complete — nothing to tear down).
+- `QA_BOOTSTRAP_STATUS=TEARDOWN_FAILED` → log warning. The summary report's footer will note this.
+
+Do not change the overall run outcome based on teardown status — this step is cleanup, not validation.
 
 ### Step 7: Final output
 
@@ -149,3 +151,26 @@ Test run complete.
 Reports directory: {QA_AGENT_DIR}/{reports_output_dir}/
 Summary: {QA_AGENT_DIR}/{reports_output_dir}/{timestamp}-summary.md
 ```
+
+---
+
+## When NOT to use
+
+- The project uses `flutter drive` / `integration_test` without Appium — use `qa-flutter-manual-runner`.
+- The project has no companion `qa-agent/` directory with `scripts/bootstrap.py`, `scripts/teardown.py`, `scripts/appium_runner.py` — those scripts are prerequisite. See [docs/references/appium-bootstrap-contract.md](../../docs/references/appium-bootstrap-contract.md) for the contract those scripts must honor.
+- You only need unit or widget tests — use `qa-flutter-unit-generator`.
+- The feature isn't implemented yet — `bootstrap.py` will launch but tests will find no UI.
+
+## Common mistakes
+
+| Mistake | Fix |
+|---|---|
+| Dispatching sub-agents in parallel | Spec is explicit: strictly sequential. Parallel breaks the Appium session. |
+| Skipping the bootstrap-status.json check | Half-started services cause confusing errors down the line — always check. |
+| Passing hardcoded `CONFIG_PATH` | Resolve via cwd + walk-up, not a static constant. |
+| Forgetting to mark the task `completed` on TIMEOUT | The runner's summary reads task states; a lingering `in_progress` corrupts the report. |
+| Running without `project.backend.path` resolved | Sub-agents need git hash from the backend repo for the report header. |
+
+## Decision — when to pick this vs `qa-flutter-manual-runner`
+
+See [docs/android-stacks.md](../../docs/android-stacks.md) for the full decision matrix. Short version: pick this when you need gestos nativos, multi-app flows, or are running against a pre-compiled APK.
