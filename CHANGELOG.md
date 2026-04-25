@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-04-24
+
+Usability patch — slash commands and CLI permission docs.
+
+### Added
+
+- **`commands/` directory** with four slash commands wrapping the most-used skills: `/qa-run`, `/qa-unit`, `/qa-release-gate`, `/qa-bootstrap`. Previously the skills could only be invoked via natural language or `claude -p` prompts — now they appear in the slash menu.
+- **README — "CLI permissions in unattended mode"** section explaining the `.claude/settings.local.json` allowlist needed when running `claude -p` (non-interactive) so the orchestrator does not hang on the first denied tool call.
+
+### Notes
+
+- No skill or agent behavior changed in this release. Existing skills and tags continue to work; the slash commands are additive convenience.
+
 ## [1.1.0] — 2026-04-23
 
 Autonomous orchestrator cohort. Closes roadmap gaps G1, G2, G4, G6 and upgrades report quality.

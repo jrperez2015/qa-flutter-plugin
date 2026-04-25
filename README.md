@@ -2,7 +2,7 @@
 
 [![Plugin Validation](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](CHANGELOG.md)
 
 QA plugin for Flutter projects — covers the full testing pyramid (unit/widget/state → integration/E2E → stability) across Android and Web, with an **autonomous orchestrator** that brings up the backend, boots the device, runs tests, emits an actionable report + JSON artifact, and tears everything down. Designed as a pre-release stability gate.
 
@@ -446,6 +446,48 @@ user: schedule '/qa-release-gate --auto --threshold=strict' every day at 03:00
 ```
 
 Either way, the gate handles lifecycle. See [docs/references/appium-bootstrap-contract.md](docs/references/appium-bootstrap-contract.md) if you use the Appium stack (you must update your `scripts/bootstrap.py` to the v1 contract).
+
+### CLI permissions in unattended mode
+
+When you run `claude -p "..."` (non-interactive) or use `--permission-mode=bypassPermissions`, Claude Code **denies any tool not in an allowlist** instead of prompting. Without configuration, the orchestrator hangs on the first call to `flutter`, `adb`, `emulator`, or PowerShell.
+
+**Fix:** create `.claude/settings.local.json` at your Flutter project root with the tools the orchestrator needs:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(curl:*)",
+      "Bash(adb:*)",
+      "Bash(flutter:*)",
+      "Bash(emulator:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(node:*)",
+      "PowerShell(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Grep(*)",
+      "Glob(*)"
+    ]
+  }
+}
+```
+
+This file is per-project and not committed (include `.claude/settings.local.json` in your `.gitignore` if you don't want it shared).
+
+**Quick alternatives:**
+
+| Use case | Command |
+|---|---|
+| One-off debug, accept all risk | `claude -p "/qa-release-gate --auto" --dangerously-skip-permissions` |
+| Production / scheduled | `claude -p "/qa-release-gate --auto"` with `settings.local.json` (recommended) |
+| Manual tuning per session | `claude` (interactive) — approve each tool the first time, Claude remembers |
+
+If you have the `update-config` skill installed, you can ask Claude to set the allowlist for you: *"configurame settings.local.json con allowlist para git, flutter, adb, emulator, powershell, curl"*.
 
 ### Recovery
 

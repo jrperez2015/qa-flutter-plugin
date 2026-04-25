@@ -6,7 +6,12 @@
 .claude-plugin/plugin.json      ← plugin manifest (name, version, author)
 agents/                         ← orchestrator sub-agents
   qa-stability-agent.md
-skills/                         ← slash-command skills
+commands/                       ← slash-command wrappers
+  qa-run.md                     ← /qa-run <feature>
+  qa-unit.md                    ← /qa-unit <feature>
+  qa-release-gate.md            ← /qa-release-gate
+  qa-bootstrap.md               ← /qa-bootstrap --up | --down
+skills/                         ← skill definitions (model-invoked)
   qa-flutter-bootstrap/         ← autonomous lifecycle (backend + device)
   qa-flutter-unit-generator/    ← unit/widget/state generator
   qa-flutter-manual-runner/     ← flutter_drive integration runner
