@@ -470,12 +470,32 @@ When you run `claude -p "..."` (non-interactive) or use `--permission-mode=bypas
       "Read(*)",
       "Write(*)",
       "Edit(*)",
+      "MultiEdit(*)",
       "Grep(*)",
-      "Glob(*)"
+      "Glob(*)",
+      "Monitor(*)",
+      "BashOutput(*)",
+      "TodoWrite(*)",
+      "Task(*)"
     ]
   }
 }
 ```
+
+**Why each entry matters:**
+
+| Pattern | Used by |
+|---|---|
+| `Bash(git:*)`, `Bash(curl:*)` | git operations, backend health checks |
+| `Bash(adb:*)`, `Bash(flutter:*)`, `Bash(emulator:*)` | Android device interaction, test execution |
+| `Bash(rm:*)`, `Bash(mkdir:*)`, `Bash(cp:*)`, `Bash(node:*)` | Filesystem operations, Node-based plugin validation |
+| `PowerShell(*)` | Windows-side backend lifecycle scripts (start/stop the Spring Boot app) |
+| `Read(*)`, `Write(*)`, `Edit(*)`, `MultiEdit(*)`, `Grep(*)`, `Glob(*)` | Skill-driven file inspection and report generation |
+| `Monitor(*)`, `BashOutput(*)` | Reading output from long-running background processes (test runs, emulator boot) |
+| `TodoWrite(*)` | Skill progress tracking |
+| `Task(*)` | Sub-agent dispatch (release-gate spawns the stability agent, etc.) |
+
+Trim entries you do not use (e.g. omit `PowerShell(*)` on macOS/Linux, omit `Bash(emulator:*)` for web-only projects).
 
 This file is per-project and not committed (include `.claude/settings.local.json` in your `.gitignore` if you don't want it shared).
 
