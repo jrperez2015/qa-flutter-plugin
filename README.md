@@ -2,9 +2,9 @@
 
 [![Plugin Validation](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](CHANGELOG.md)
 
-QA plugin for Flutter projects — covers the full testing pyramid (unit/widget/state → integration/E2E → stability) across Android and Web, with an **autonomous orchestrator** that brings up the backend, boots the device, runs tests, emits an actionable report + JSON artifact, and tears everything down. Designed as a pre-release stability gate.
+QA plugin for Flutter projects — covers the full testing pyramid (unit/widget/state → integration/E2E → stability) across Android and Web, with a **self-learning autonomous orchestrator** that brings up the backend, boots the device, applies known environment fixes automatically, runs tests, emits an actionable report + JSON artifact, and tears everything down. Designed as a pre-release stability gate.
 
 ## Installation
 
@@ -97,6 +97,8 @@ Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-f
 | `qa-flutter-android-tester` | (sub-agent, not user-invoked) | Integration / E2E | Appium — single feature | Android |
 | `qa-flutter-web-runner` | `/qa-flutter-web-runner "<objective>"` | Stability + checklist | `flutter analyze/test/build web` + git diff | Web |
 | `qa-flutter-release-gate` | `/qa-release-gate [--threshold] [--version]` | Go/No-Go release gate | Wraps `qa-stability-agent` + severity classification | Any |
+| `qa-flutter-bootstrap` | (invoked by orchestrator) | Infrastructure lifecycle | Brings up backend + device; idempotent teardown via marker file | Android / Any |
+| `qa-knowledge-manager` | `/qa-knowledge-manager [preflight\|learn\|register\|report]` | Autoaprendizaje | Applies known environment fixes before run; learns new errors after | Any |
 
 ---
 
@@ -104,7 +106,13 @@ Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-f
 
 ### What it does
 
-Entry point for **post-implementation QA**. Reads `qa-agent.yaml`, detects the platform and Android stack, then delegates to the correct runner skill. Optionally runs unit coverage after the main E2E pass.
+Entry point for **post-implementation QA**. Reads `qa-agent.yaml`, detects the platform and Android stack, then runs the full knowledge-augmented cycle:
+
+1. **Knowledge preflight** (Step 0a) — checks `qa-knowledge.yaml` for known environment issues and applies automatic fixes before the run starts.
+2. **Runner** — delegates to the correct runner skill (`flutter_drive` or Appium).
+3. **Knowledge learn** (Step 0b) — scans the run output for new errors and updates `qa-knowledge.yaml` with user confirmation.
+
+Optionally runs unit coverage after the main E2E pass. If `qa-knowledge.yaml` does not exist, behaves exactly as v1.1.x — the knowledge steps are no-ops.
 
 ### When to use
 
@@ -134,6 +142,15 @@ Entry point for **post-implementation QA**. Reads `qa-agent.yaml`, detects the p
 ```
 
 Or ask Claude directly: `"Invoca qa-stability-agent para validar la rama"`.
+
+**CLI flags:**
+
+| Flag | Description |
+|---|---|
+| `--auto` | Non-interactive mode for CI. On a blocking preflight, continues and logs a warning. |
+| `--dry-run` | Reads config and simulates the execution plan without running tests. |
+| `--skip-preflight` | Skips Step 0a (useful when preflight was run manually beforehand). |
+| `--skip-learn` | Skips Step 0b (useful in debug runs where you don't want to modify the knowledge base). |
 
 ### Generic example — end-to-end
 
@@ -177,19 +194,23 @@ Overall verdict: PASS
 
 ### Verdict semantics
 
-| Verdict | Meaning |
-|---|---|
-| `PASS` | All executed features passed; unit coverage meets target if run |
-| `PARCIAL` | Some tests failed or coverage below target — review the linked reports |
-| `FAIL` | Main runner aborted (bootstrap failure, device lost, build broken) |
+| Verdict | Exit code | Meaning |
+|---|---|---|
+| `GO` | 0 | All tests passed; knowledge preflight clean; unit coverage meets target if run |
+| `NO-GO` | 1 | Failures found, configuration error, or blocking preflight issue |
+| `CONDITIONAL` | 2 | Mixed results requiring human review before proceeding |
 
 ### Failure modes
 
 | Failure | Agent behavior |
 |---|---|
 | `qa-agent.yaml` not found | Asks for path; aborts if user doesn't provide |
+| `qa-knowledge.yaml` not found | Informs user; skips Steps 0a/0b and continues normally |
+| Preflight detects a blocking issue | Pauses and asks user: continue anyway or stop. In `--auto` mode: continues and logs a warning |
+| Preflight auto-fix fails | Shows `fallback_message` to user; asks whether to continue |
 | Delegated skill aborts in pre-flight (backend down, device missing) | Returns the pre-flight error message verbatim; no retry |
-| Main runner passes, `post_run.include_unit` step fails | Returns main PASS + unit FAIL — does not override main verdict |
+| Main runner passes, `post_run.include_unit` step fails | Returns main GO + unit failure noted — does not override main verdict |
+| `learn` step fails | Logs error; does not affect the run verdict |
 | Ambiguous `project.platform` | Defaults to `android`; if `android_stack` also absent, defaults to `flutter_drive` |
 
 ### Limitations
@@ -533,6 +554,51 @@ The skill is idempotent — it tears down only what the marker says was started,
 
 ---
 
+## Autoaprendizaje (qa-knowledge-manager)
+
+`qa-knowledge-manager` is the self-learning layer of the orchestrator. It wraps every QA run with two lightweight steps that accumulate and reuse environment knowledge across runs.
+
+### How it works
+
+```
+[qa-stability-agent]
+  └─ Step 0a: /qa-knowledge-manager preflight   ← BEFORE the run
+  └─ Steps 1–N: runner skills                   ← normal run
+  └─ Step 0b: /qa-knowledge-manager learn       ← AFTER the run
+```
+
+**Preflight** reads `qa-knowledge.yaml`, finds active entries whose `preflight_check` matches the current environment, and applies solutions automatically (`auto_apply: true`) or prompts the user (`auto_apply: false`). Common examples: starting a stopped emulator, freeing a blocked port, verifying backend health.
+
+**Learn** scans the run output for new errors, checks whether they were already registered, and drafts new `qa-knowledge.yaml` entries — with the user confirming before anything is written.
+
+### Enabling it
+
+Copy the starter template to your project root:
+
+```bash
+cp ~/.claude/plugins/local/qa-flutter/templates/qa-knowledge.yaml ./qa-knowledge.yaml
+```
+
+Commit `qa-knowledge.yaml` with your project — it is project-specific and grows with your environment. If the file is absent, the knowledge steps are no-ops and the orchestrator behaves exactly as v1.1.x.
+
+### Manual modes
+
+```bash
+/qa-knowledge-manager preflight   # check environment before a manual session
+/qa-knowledge-manager learn       # backfill knowledge from a recent run
+/qa-knowledge-manager register    # document a known fix proactively
+/qa-knowledge-manager report      # audit current knowledge base
+```
+
+### Add it to `qa-agent.yaml` (optional path override)
+
+```yaml
+knowledge:
+  path: "./qa-knowledge.yaml"     # default: project root
+```
+
+---
+
 ## Reports
 
 ### Location
@@ -586,6 +652,11 @@ qa-flutter/
     qa-flutter-android-runner/
     qa-flutter-android-tester/
     qa-flutter-web-runner/
+    qa-flutter-release-gate/
+    qa-flutter-bootstrap/
+    qa-knowledge-manager/           ← autoaprendizaje cycle
+  templates/
+    qa-knowledge.yaml               ← starter template; copy to project root
   docs/
     android-stacks.md               ← decision matrix
   README.md                         ← this file
