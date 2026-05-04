@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] — 2026-05-04
+## [1.30] — 2026-05-04
 
 QA planning layer. Closes roadmap gap **G8** (planning artifact). Backward-compatible — runners keep their existing on-the-fly behavior when no plan is provided.
 
@@ -24,7 +24,7 @@ QA planning layer. Closes roadmap gap **G8** (planning artifact). Backward-compa
 - **`qa-stability-agent`** — new Step 2.5 resolves plans for each feature in the implementation summary. Auto-injects `--plan=<path>` to the routed runner. Honors `planning.require_plan: true` by aborting with NO-GO when plans are missing.
 - **`commands/qa-run.md`** — accepts `--plan=<path>` and documents it.
 - **README** — new "Planificación de QA" section documenting when to plan, configuration, plan vs. report distinction. Quick start updated to suggest `/qa-plan` first.
-- **Plugin manifest** — version bumped to `1.2.0`.
+- **Plugin manifest** — version bumped to `1.30`.
 
 ### Roadmap
 
