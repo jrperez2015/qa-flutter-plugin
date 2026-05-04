@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-04
+
+QA planning layer. Closes roadmap gap **G8** (planning artifact). Backward-compatible — runners keep their existing on-the-fly behavior when no plan is provided.
+
+### Added
+
+- **`qa-flutter-test-planner` skill** — produces an auditable, human-editable QA test plan at `qa-plans/<feature>.md` covering: scope, pantallas a cubrir, precondiciones / datos requeridos, flujos end-to-end (happy + error), criterios de aceptación, riesgos / fuera de scope. Markdown body with YAML frontmatter that downstream runners parse. Invokable as `/qa-plan <feature>` (interactive) or `/qa-plan <feature> --auto` (CI / scheduled refresh).
+- **`/qa-plan` slash command** routing to the planner skill.
+- **`planning:` block in `qa-agent.yaml`** — `enabled`, `test_plan_dir` (default `qa-plans/`), `require_plan`, `score_threshold`, `flow_depth`, `aliases`, `precondition_severity_overrides`. All optional.
+- **References under the planner skill** — `plan-template.md` (canonical artifact format), `screens-discovery.md` (multi-layer semantic resolution playbook generalized from manual-runner § C.1), `preconditions-checklist.md` (canonical list of preconditions with detection sources and severity rules).
+
+### Changed
+
+- **`qa-flutter-manual-runner`** — `--plan=<path>` flag added. New Section C.0 reads the plan when provided and skips the on-the-fly resolution in C.1–C.2; C.3.2 uses plan flow steps as test step seeds.
+- **`qa-flutter-android-runner`** — Step 3 uses plan's Section 2 (pantallas) as feature list and Section 4 (flujos) as test scenarios passed to the `qa-flutter-android-tester` sub-agent. Falls back to free-form parsing without `--plan`.
+- **`qa-flutter-web-runner`** — Step 6 uses plan's Section 2 instead of git-diff analysis when `--plan` is provided. Step 7 checklist seeded from plan flows + preconditions.
+- **`qa-stability-agent`** — new Step 2.5 resolves plans for each feature in the implementation summary. Auto-injects `--plan=<path>` to the routed runner. Honors `planning.require_plan: true` by aborting with NO-GO when plans are missing.
+- **`commands/qa-run.md`** — accepts `--plan=<path>` and documents it.
+- **README** — new "Planificación de QA" section documenting when to plan, configuration, plan vs. report distinction. Quick start updated to suggest `/qa-plan` first.
+- **Plugin manifest** — version bumped to `1.2.0`.
+
+### Roadmap
+
+- **G8 — Planning artifact** ✅ closed in this release.
+
 ## [1.1.1] — 2026-04-24
 
 Usability patch — slash commands and CLI permission docs.

@@ -1,7 +1,7 @@
 ---
 name: qa-flutter-android-runner
-description: Use when running full QA suite on a Flutter Android app that uses the Appium stack (qa-agent.yaml with appium.device_name, backend Python scripts). Requires the qa-agent/ companion directory with bootstrap.py and teardown.py. NOT for flutter_drive-based testing — use qa-flutter-manual-runner. NOT for unit/widget tests — use qa-flutter-unit-generator. NOT for Flutter web — use qa-flutter-web-runner.
-argument-hint: "<test objective>"
+description: Use when running full QA suite on a Flutter Android app that uses the Appium stack (qa-agent.yaml with appium.device_name, backend Python scripts). Requires the qa-agent/ companion directory with bootstrap.py and teardown.py. Optionally consumes a pre-generated plan via --plan=<path> instead of parsing a free-form objective. NOT for flutter_drive-based testing — use qa-flutter-manual-runner. NOT for unit/widget tests — use qa-flutter-unit-generator. NOT for Flutter web — use qa-flutter-web-runner.
+argument-hint: "<test objective> [--plan=<path>]"
 ---
 
 # qa-flutter-android-runner
@@ -66,14 +66,24 @@ Parse stdout:
 
 ### Step 3: Parse test objective into feature list
 
-Given the argument passed to `/qa-flutter-android-runner`, identify the individual features to test.
+**Plan-driven path (preferred):** If the invocation contains `--plan=<path>`, OR `qa-agent.yaml` has `planning.test_plan_dir` set and a plan exists for the requested feature, load the plan instead of parsing the free-form objective:
+
+1. Read the plan file. Verify YAML frontmatter `feature: {expected}`.
+2. Use **Section 2 — Pantallas a cubrir** to derive the feature list (one entry per row).
+3. Use **Section 4 — Flujos** to enrich the prompt sent to each `qa-flutter-android-tester` sub-agent in Step 4 — pass the flow steps as the test scenario instead of letting the sub-agent infer them.
+4. Skip the free-form parsing rules below.
+
+**Free-form path (fallback, no plan):** Given the argument passed to `/qa-flutter-android-runner`, identify the individual features to test.
 
 Rules:
 - Extract concrete feature names as lowercase slugs (e.g. "signup", "login", "password-recovery")
 - If more features are identified than `max_features_per_run`, take the first N and note the rest as "not executed" in the summary
 - If the objective is ambiguous, test the most specific features you can infer
 
-Print the feature list to the user before dispatching sub-agents.
+Print the feature list to the user before dispatching sub-agents. If a plan was loaded, also print:
+```
+Usando plan: {PLAN_PATH} ({N} pantallas, {N} flujos)
+```
 
 ### Step 4: Dispatch sub-agents — one per feature, strictly sequential
 

@@ -1,7 +1,7 @@
 {
   "name": "qa-flutter",
   "description": "QA orchestration for Flutter — full testing pyramid (unit/widget/state → integration/E2E → stability → release gate) with autonomous lifecycle (backend bootstrap, device boot, tests, teardown) for Android (flutter_drive default, Appium opt-in) and Web.",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "author": {
     "name": "José Rolando Pérez Sandó",
     "email": "jrperez2015@gmail.com"
@@ -13,6 +13,7 @@
     "web",
     "stability",
     "release-gate",
+    "test-planning",
     "autonomous",
     "integration-testing",
     "claude-code"

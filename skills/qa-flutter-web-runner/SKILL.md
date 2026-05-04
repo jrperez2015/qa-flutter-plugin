@@ -1,7 +1,7 @@
 ---
 name: qa-flutter-web-runner
-description: Use when validating a Flutter web app's stability after implementation changes, or when a post-implementation QA checklist is needed for a web build. Produces a manual test checklist scoped to the files touched by the recent git diff. NOT for Android — use qa-flutter-android-runner or qa-flutter-manual-runner. NOT for unit/widget test generation — use qa-flutter-unit-generator.
-argument-hint: "<objective or 'stability-check'>"
+description: Use when validating a Flutter web app's stability after implementation changes, or when a post-implementation QA checklist is needed for a web build. Produces a manual test checklist scoped to the files touched by the recent git diff (or to the screens listed in a plan via --plan=<path>). NOT for Android — use qa-flutter-android-runner or qa-flutter-manual-runner. NOT for unit/widget test generation — use qa-flutter-unit-generator.
+argument-hint: "<objective or 'stability-check'> [--plan=<path>]"
 ---
 
 # qa-flutter-web-runner
@@ -115,7 +115,18 @@ If **BUILD_FAILED**: print error and STOP. The app cannot be tested further.
 
 ### Step 6: Identify impacted functionalities
 
-Use TaskCreate to create a task "Analyze git diff" and mark it in_progress.
+Use TaskCreate to create a task "Analyze impacted functionalities" and mark it in_progress.
+
+**Plan-driven path (preferred):** If the invocation contains `--plan=<path>`, OR `qa-agent.yaml` has `planning.test_plan_dir` set and a plan exists for the requested feature/objective, load the plan:
+
+1. Read the plan file. Verify YAML frontmatter `platform: web`.
+2. Use **Section 2 — Pantallas a cubrir** as the impacted-areas list. Each row's `Archivo` becomes the file path; group by parent directory using the same mapping rules below.
+3. Use **Section 4 — Flujos** to seed the test checklist in Step 7 (one checkbox per flow step).
+4. Use **Section 3 — Precondiciones** to add pre-flight checkboxes at the top of the checklist.
+5. Skip the git-diff fallback below.
+6. Mark task completed.
+
+**Git-diff fallback (no plan):**
 
 Run via Bash (cwd = FLUTTER_PATH):
 ```bash
