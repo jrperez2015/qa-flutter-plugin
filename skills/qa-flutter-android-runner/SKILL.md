@@ -16,13 +16,14 @@ Example: `/qa-flutter-android-runner "test el flujo de registro y login de usuar
 
 Resolve `CONFIG_PATH` at runtime — **never hardcode**:
 
-1. Check `./qa-agent.yaml` in the current working directory.
-2. If absent, walk up from cwd looking for a `pubspec.yaml` sibling, then look for `qa-agent.yaml` there.
-3. If still not found, ask the user: `"¿Cuál es la ruta absoluta al archivo qa-agent.yaml?"`.
+1. Check `./qa-plugin-config/qa-agent.yaml` in the current working directory.
+2. If absent, walk up from cwd looking for a `pubspec.yaml` sibling, then look for `qa-plugin-config/qa-agent.yaml` there.
+3. If still not found, ask the user: `"¿Cuál es la ruta absoluta al archivo qa-plugin-config/qa-agent.yaml?"`.
 
-`QA_AGENT_DIR` = directory containing the resolved `CONFIG_PATH`.
+`QA_AGENT_DIR` = directory containing the resolved `CONFIG_PATH` (= `{PROJECT_ROOT}/qa-plugin-config`).
+`PROJECT_ROOT` = parent of `QA_AGENT_DIR` (= directory containing `pubspec.yaml`).
 
-Under `QA_AGENT_DIR` there must exist `scripts/bootstrap.py` and `scripts/teardown.py` for the Appium stack. If missing → abort with instructions to install the qa-agent companion.
+Under `QA_AGENT_DIR` there must exist `scripts/bootstrap.py` and `scripts/teardown.py` for the Appium stack (at `qa-plugin-config/scripts/`). If missing → abort with instructions to install the qa-agent companion scripts inside `qa-plugin-config/`.
 
 ## Execution — follow every step in order
 
@@ -62,11 +63,11 @@ Parse stdout:
 
 **Note:** `qa-flutter-bootstrap` internally detects `project.android_stack == "appium"` and delegates to `scripts/bootstrap.py` in the companion qa-agent directory. The contract that `bootstrap.py` must honor is documented in [docs/references/appium-bootstrap-contract.md](../../docs/references/appium-bootstrap-contract.md).
 
-**Deprecated path:** Invoking `python scripts/bootstrap.py qa-agent.yaml` directly is still functional during the current minor release as a fallback — if the user's `bootstrap.py` does not yet support the `--marker` flag, `qa-flutter-bootstrap` will synthesize a marker from the legacy `bootstrap-status.json`. This fallback will be removed in the next minor release.
+**Deprecated path:** Invoking `python scripts/bootstrap.py qa-plugin-config/qa-agent.yaml` directly is still functional during the current minor release as a fallback — if the user's `bootstrap.py` does not yet support the `--marker` flag, `qa-flutter-bootstrap` will synthesize a marker from the legacy `bootstrap-status.json`. This fallback will be removed in the next minor release.
 
 ### Step 3: Parse test objective into feature list
 
-**Plan-driven path (preferred):** If the invocation contains `--plan=<path>`, OR `qa-agent.yaml` has `planning.test_plan_dir` set and a plan exists for the requested feature, load the plan instead of parsing the free-form objective:
+**Plan-driven path (preferred):** If the invocation contains `--plan=<path>`, OR `qa-plugin-config/qa-agent.yaml` has `planning.test_plan_dir` set and a plan exists for the requested feature, load the plan instead of parsing the free-form objective:
 
 1. Read the plan file. Verify YAML frontmatter `feature: {expected}`.
 2. Use **Section 2 — Pantallas a cubrir** to derive the feature list (one entry per row).

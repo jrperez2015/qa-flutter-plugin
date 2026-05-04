@@ -9,7 +9,7 @@ Follow the skill's SKILL.md exactly — start with Step 1 (parse arguments) and 
 
 If `$ARGUMENTS` is empty, abort with the usage hint.
 
-The skill writes a markdown plan to `qa-plans/<feature>.md` (or the path given via `--output=`). After the plan is written, suggest the next step:
+The skill writes a markdown plan to `qa-plugin-config/qa-plans/<feature>.md` (or the path given via `--output=`). After the plan is written, suggest the next step:
 
 ```
 /qa-run <feature> --plan=<path-to-plan>

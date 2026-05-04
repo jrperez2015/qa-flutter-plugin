@@ -16,13 +16,15 @@ OR delegated automatically by `qa-stability-agent` when `project.platform` is `"
 
 Resolve `CONFIG_PATH` at runtime — **never hardcode**:
 
-1. Check `./qa-agent.yaml` in the current working directory.
-2. If absent, walk up from cwd looking for a `pubspec.yaml` sibling, then look for `qa-agent.yaml` there.
-3. If still not found, ask: `"¿Cuál es la ruta absoluta al archivo qa-agent.yaml?"`.
+1. Check `./qa-plugin-config/qa-agent.yaml` in the current working directory.
+2. If absent, walk up from cwd looking for a `pubspec.yaml` sibling, then look for `qa-plugin-config/qa-agent.yaml` there.
+3. If still not found, ask: `"¿Cuál es la ruta absoluta al archivo qa-plugin-config/qa-agent.yaml?"`.
 
-`QA_AGENT_DIR` = directory containing the resolved `CONFIG_PATH`. Reports are written under `{QA_AGENT_DIR}/{reports_output_dir}`.
+`QA_AGENT_DIR` = directory containing the resolved `CONFIG_PATH` (= `{PROJECT_ROOT}/qa-plugin-config`).
+`PROJECT_ROOT` = parent of `QA_AGENT_DIR` (= directory containing `pubspec.yaml`).
+Reports are written under `{QA_AGENT_DIR}/{reports_output_dir}`.
 
-Expected `qa-agent.yaml` fields for web mode:
+Expected `qa-plugin-config/qa-agent.yaml` fields for web mode:
 ```yaml
 project:
   platform: "web"
@@ -34,7 +36,7 @@ project:
   web:
     base_url: "http://localhost:8080"   # where the app runs locally
 agent:
-  reports_output_dir: "qa-reports"
+  reports_output_dir: "qa-reports"      # relative to qa-plugin-config/ → qa-plugin-config/qa-reports/
 ```
 
 ## Execution — follow every step in order

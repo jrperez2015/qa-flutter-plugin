@@ -2,7 +2,7 @@
 name: qa-stability-agent
 description: >
   Usa este agente cuando el usuario quiera ejecutar un ciclo completo de QA autónomo
-  sobre un proyecto Flutter. Es el orquestador principal: lee `qa-agent.yaml`, elige
+  sobre un proyecto Flutter. Es el orquestador principal: lee `qa-plugin-config/qa-agent.yaml`, elige
   el stack de pruebas, ejecuta los runners, aplica autoaprendizaje y emite el veredicto
   GO/NO-GO.
 
@@ -39,7 +39,7 @@ color: green
 
 ## Descripción
 
-Orquestador principal del QA autónomo. Lee `qa-agent.yaml`, decide el stack
+Orquestador principal del QA autónomo. Lee `qa-plugin-config/qa-agent.yaml`, decide el stack
 de pruebas apropiado, ejecuta el ciclo completo y emite el veredicto GO/NO-GO.
 
 **Versión:** 2.1 — incluye ciclo de autoaprendizaje (qa-knowledge-manager)
@@ -60,7 +60,7 @@ claude -p "/qa-stability-agent --dry-run" # verificar config sin ejecutar
 
 ```
 Step 0a  → Knowledge Preflight   (qa-knowledge-manager preflight)
-Step 1   → Leer configuración    (qa-agent.yaml)
+Step 1   → Leer configuración    (qa-plugin-config/qa-agent.yaml)
 Step 2   → Seleccionar stack     (flutter_drive | appium | web | unit)
 Step 2.5 → Resolve plans         (si planning.enabled — opcional)
 Step 3   → Ejecutar runner       (skill correspondiente)
@@ -94,9 +94,9 @@ Si exit code == 1 (problema bloqueante no resuelto):
   → Si el usuario elige (b) o si --auto está activo: continuar a Step 1
   → Si el usuario elige (a) o no responde: salir con código 1
 
-Si qa-knowledge.yaml no existe:
-  → Informar: "ℹ️ qa-knowledge.yaml no encontrado. El run continuará sin preflight.
-     Para habilitar el autoaprendizaje, crear el archivo desde el template."
+Si qa-plugin-config/qa-knowledge.yaml no existe:
+  → Informar: "ℹ️ qa-plugin-config/qa-knowledge.yaml no encontrado. El run continuará sin preflight.
+     Para habilitar el autoaprendizaje, crear el archivo en qa-plugin-config/ desde el template."
   → Continuar a Step 1
 ```
 
@@ -104,7 +104,7 @@ Si qa-knowledge.yaml no existe:
 
 ## Step 1 — Leer configuración
 
-Leer `qa-agent.yaml` en el directorio actual. Validar campos requeridos:
+Leer `qa-plugin-config/qa-agent.yaml` en el directorio actual. Validar campos requeridos:
 - `project.platform`
 - `project.android_stack` (si platform == android)
 - `reports.output_dir`
@@ -114,7 +114,7 @@ Si falta algún campo requerido → error inmediato, no continuar.
 Capturar campos opcionales para uso en steps posteriores:
 - `post_run.include_unit` — si `true`, correr unit coverage tras el runner principal
 - `planning.enabled` — si `true`, activar Step 2.5
-- `planning.test_plan_dir` — directorio de planes (default: `qa-plans/`)
+- `planning.test_plan_dir` — directorio de planes (default: `qa-plugin-config/qa-plans/`)
 - `planning.require_plan` — si `true`, abortar ante features sin plan
 
 ---
@@ -181,13 +181,13 @@ Si el usuario elige (b):
 
 Si `PLAN_MAP` es non-empty, pasar `--plan` por feature antes de invocar:
 - `qa-flutter-manual-runner` (modo single-feature): invocar una vez por feature en `PLAN_MAP` con `--plan=<path>`. Features sin plan → invocar con la lógica `regresion` legacy.
-- `qa-flutter-android-runner`: pasar el PLAN_MAP dentro del objective string (e.g. `"login (plan=qa-plans/login.md), signup (plan=qa-plans/signup.md)"`); el runner parsea las anotaciones `--plan=`.
+- `qa-flutter-android-runner`: pasar el PLAN_MAP dentro del objective string (e.g. `"login (plan=qa-plugin-config/qa-plans/login.md), signup (plan=qa-plugin-config/qa-plans/signup.md)"`); el runner parsea las anotaciones `--plan=`.
 - `qa-flutter-web-runner`: pasar `--plan=<path>` del plan más relevante (omitir si no hay plan para el área impactada).
 
 Invocar via el Skill tool. Capturar la ruta del reporte generado.
 
 Durante la ejecución, monitorear stdout/stderr:
-- Si se detecta un error que coincide con algún patrón de `qa-knowledge.yaml`:
+- Si se detecta un error que coincide con algún patrón de `qa-plugin-config/qa-knowledge.yaml`:
   - Log: `[KNOWLEDGE] Patrón K0XX detectado durante el run`
   - Si `auto_apply: true` y no fue aplicado en el preflight: intentar aplicar la solución
   - Si la solución se aplica exitosamente: reintentar el step fallido (máximo 1 reintento)
@@ -208,7 +208,7 @@ Capturar el veredicto: GO | NO-GO | CONDITIONAL.
 
 ```
 1. Invocar: /qa-knowledge-manager learn
-2. El skill analizará el reporte y actualizará qa-knowledge.yaml
+2. El skill analizará el reporte y actualizará qa-plugin-config/qa-knowledge.yaml
 3. Si se registraron nuevas entradas: informar al usuario cuáles fueron
 ```
 
@@ -259,13 +259,13 @@ Exit codes:
 
 Si un runner falla con exit code != 0:
 1. Capturar el error completo
-2. Verificar si coincide con algún patrón de `qa-knowledge.yaml` (si no fue detectado antes)
+2. Verificar si coincide con algún patrón de `qa-plugin-config/qa-knowledge.yaml` (si no fue detectado antes)
 3. Si hay solución automática disponible y no fue intentada: aplicarla y reintentar (1 vez)
 4. Si no hay solución o el reintento falla: continuar con el resultado fallido
 5. El modo `learn` procesará el error al finalizar
 
 **No detener el run por errores individuales de steps, salvo:**
-- Fallo de validación de `qa-agent.yaml`
+- Fallo de validación de `qa-plugin-config/qa-agent.yaml`
 - Preflight bloqueante con usuario eligiendo detener
 
 ---
@@ -273,6 +273,6 @@ Si un runner falla con exit code != 0:
 ## Compatibilidad con versiones anteriores
 
 Este agente (v2.1) es retrocompatible:
-- Si `qa-knowledge.yaml` no existe → el agente funciona exactamente igual que v2.0
+- Si `qa-plugin-config/qa-knowledge.yaml` no existe → el agente funciona exactamente igual que v2.0
 - Si los steps 0a y 0b fallan → se ignoran sin afectar el run principal
 - Los flags `--skip-preflight` y `--skip-learn` reproducen el comportamiento de v2.0

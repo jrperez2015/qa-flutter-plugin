@@ -1,6 +1,7 @@
 # ============================================================
 # qa-knowledge.yaml — Base de conocimiento QA Autónomo v2
-# Colocar en la raíz del proyecto Flutter, junto a qa-agent.yaml
+# Colocar en qa-plugin-config/, junto a qa-agent.yaml
+# Ejemplo: cp ~/.claude/plugins/local/qa-flutter/templates/qa-knowledge.yaml ./qa-plugin-config/qa-knowledge.yaml
 # ============================================================
 #
 # Este archivo registra errores conocidos y sus soluciones.

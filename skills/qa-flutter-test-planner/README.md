@@ -8,7 +8,7 @@ Generates an auditable, human-editable test plan covering screens, preconditions
 
 ## What it does
 
-A single command — `/qa-plan <feature>` — produces a markdown+YAML plan at `qa-plans/<feature>.md` that:
+A single command — `/qa-plan <feature>` — produces a markdown+YAML plan at `qa-plugin-config/qa-plans/<feature>.md` that:
 
 1. Lists which **screens** are touched by the feature (multi-screen, not just the entry page).
 2. Documents **required preconditions**: env vars, backend state, test users, seed data, device permissions.
@@ -41,7 +41,7 @@ A standalone planning skill produces a **versionable, reviewable, editable** art
 /qa-plan login
 ```
 
-The skill walks through screens, preconditions, flows, criteria, and risks, asking "OK / Editar / Quitar?" after each section. Final plan written to `qa-plans/login.md`.
+The skill walks through screens, preconditions, flows, criteria, and risks, asking "OK / Editar / Quitar?" after each section. Final plan written to `qa-plugin-config/qa-plans/login.md`.
 
 ### Generate a plan (auto / CI)
 
@@ -54,7 +54,7 @@ No prompts. Useful before nightly stability runs where you want a fresh plan che
 ### Custom output path
 
 ```
-/qa-plan checkout --output=qa-plans/v1.2/checkout.md
+/qa-plan checkout --output=qa-plugin-config/qa-plans/v1.2/checkout.md
 ```
 
 Useful for version-scoping plans (e.g. one set per release).
@@ -62,7 +62,7 @@ Useful for version-scoping plans (e.g. one set per release).
 ### Then run with the plan
 
 ```
-/qa-run login --plan=qa-plans/login.md
+/qa-run login --plan=qa-plugin-config/qa-plans/login.md
 ```
 
 The runner skips its on-the-fly resolution and uses the plan as input.
@@ -124,12 +124,12 @@ blocker_risks: 0
 
 ---
 
-## Configuration in `qa-agent.yaml`
+## Configuration in `qa-plugin-config/qa-agent.yaml`
 
 ```yaml
 planning:
   enabled: true                       # default false → backward-compatible
-  test_plan_dir: "qa-plans/"          # where plans are read/written
+  test_plan_dir: "qa-plugin-config/qa-plans/"  # where plans are read/written
   require_plan: false                 # if true, runners abort without --plan
   score_threshold: 40                 # minimum Layer 1 score to include a screen
   flow_depth: 3                       # max router transitions per flow
@@ -140,7 +140,7 @@ planning:
     "Permiso CAMERA": "advisory"
 ```
 
-All fields are optional. With `planning:` block absent, the planner uses defaults (`qa-plans/`, threshold 40, depth 3, no aliases, no overrides).
+All fields are optional. With `planning:` block absent, the planner uses defaults (`qa-plugin-config/qa-plans/`, threshold 40, depth 3, no aliases, no overrides).
 
 ---
 
@@ -183,12 +183,13 @@ If a feature has no plan and `planning.require_plan: true`, the agent aborts wit
 
 ```
 <project-root>/
-  qa-agent.yaml                          # add `planning:` block
-  qa-plans/                              # commit these — they're living docs
-    login.md
-    checkout.md
-    onboarding.md
-  test/docs/QA_REPORTS/                  # outputs (gitignored)
+  qa-plugin-config/
+    qa-agent.yaml                        # add `planning:` block
+    qa-plans/                            # commit these — they're living docs
+      login.md
+      checkout.md
+      onboarding.md
+    qa-reports/                          # outputs (gitignored)
   ...
 ```
 

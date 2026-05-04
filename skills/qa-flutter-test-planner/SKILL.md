@@ -1,6 +1,6 @@
 ---
 name: qa-flutter-test-planner
-description: Use BEFORE running QA on a Flutter feature to produce an auditable test plan covering screens, preconditions, end-to-end flows, acceptance criteria and out-of-scope risks. Generates a markdown+YAML plan in qa-plans/<feature>.md that the runners (qa-flutter-manual-runner, qa-flutter-android-runner, qa-flutter-web-runner) can consume via --plan=<path>. NOT a test runner — it never executes tests, only plans them. NOT for unit/widget tests — use qa-flutter-unit-generator directly.
+description: Use BEFORE running QA on a Flutter feature to produce an auditable test plan covering screens, preconditions, end-to-end flows, acceptance criteria and out-of-scope risks. Generates a markdown+YAML plan in qa-plugin-config/qa-plans/<feature>.md that the runners (qa-flutter-manual-runner, qa-flutter-android-runner, qa-flutter-web-runner) can consume via --plan=<path>. NOT a test runner — it never executes tests, only plans them. NOT for unit/widget tests — use qa-flutter-unit-generator directly.
 argument-hint: "<feature-name> [--auto] [--output=<path>]"
 ---
 
@@ -8,19 +8,19 @@ argument-hint: "<feature-name> [--auto] [--output=<path>]"
 
 Produces an auditable QA test plan for a Flutter feature **before any test is generated or executed**. You implement the `/qa-plan` command.
 
-The output is a single artifact `qa-plans/<feature>.md` with YAML frontmatter that downstream runners read as input. This decouples the *what to test* decision (planning) from the *how to test* mechanics (runner skills).
+The output is a single artifact `qa-plugin-config/qa-plans/<feature>.md` with YAML frontmatter that downstream runners read as input. This decouples the *what to test* decision (planning) from the *how to test* mechanics (runner skills).
 
 **Invocation examples:**
 - `/qa-plan login` — interactive planning for the login feature; user reviews each section
 - `/qa-plan login --auto` — generate the plan without prompts (CI/scheduled use)
-- `/qa-plan checkout --output=qa-plans/v1.2/checkout.md` — custom output path (e.g. version-scoped)
+- `/qa-plan checkout --output=qa-plugin-config/qa-plans/v1.2/checkout.md` — custom output path (e.g. version-scoped)
 
 ## Step 1 — Parse arguments
 
 Extract from the invocation string:
 - `FEATURE` = first positional arg, trimmed and lowercased
 - `AUTO_MODE` = true if `--auto` present, false otherwise
-- `OUTPUT_PATH` = value after `--output=` if present, else `qa-plans/{FEATURE}.md`
+- `OUTPUT_PATH` = value after `--output=` if present, else `qa-plugin-config/qa-plans/{FEATURE}.md`
 
 If `FEATURE` is empty → abort:
 ```
@@ -35,7 +35,7 @@ Generando plan en modo automático — sin interacción durante el análisis.
 
 ## Step 2 — Read configuration
 
-Read `qa-agent.yaml` from the project root using the Read tool. Extract:
+Read `qa-plugin-config/qa-agent.yaml` from the project root using the Read tool. Extract:
 
 | Variable | yaml path | Default |
 |---|---|---|
@@ -43,11 +43,11 @@ Read `qa-agent.yaml` from the project root using the Read tool. Extract:
 | `ANDROID_STACK` | `project.android_stack` | `"flutter_drive"` |
 | `FLUTTER_PATH` | `project.flutter.path` (if web/appium) | cwd |
 | `BACKEND_TEST_URL` | `backend.test_url` | empty |
-| `PLAN_DIR` | `planning.test_plan_dir` | `qa-plans/` |
+| `PLAN_DIR` | `planning.test_plan_dir` | `qa-plugin-config/qa-plans/` |
 
 If `qa-agent.yaml` does not exist → continue with defaults but emit a warning:
 ```
-⚠ qa-agent.yaml no encontrado. Generando plan con valores por defecto (platform=android, stack=flutter_drive).
+⚠ qa-plugin-config/qa-agent.yaml no encontrado. Generando plan con valores por defecto (platform=android, stack=flutter_drive).
    El plan será válido pero los runners requerirán el yaml para ejecutarlo.
 ```
 
@@ -217,7 +217,7 @@ Próximo paso:
 Once a plan exists, runners can be invoked with `--plan=<path>`:
 
 ```
-/qa-run login --plan=qa-plans/login.md
+/qa-run login --plan=qa-plugin-config/qa-plans/login.md
 ```
 
 The runner reads the plan's frontmatter for routing hints, the **Pantallas a cubrir** section to know which page files to analyze, the **Precondiciones** section as additional pre-flight checks, and the **Flujos** section to drive test generation (replacing the on-the-fly semantic resolution in Section C.1–C.2 of `qa-flutter-manual-runner`).

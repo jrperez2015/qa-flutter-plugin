@@ -41,7 +41,7 @@ This skill does NOT:
 - For exploratory or dev-loop testing — use `/qa-run` or `/qa-unit` directly.
 - When implementation is still partial — the gate will noisy-fail and the report is not actionable.
 - For code review — use `superpowers:requesting-code-review`.
-- Without `qa-agent.yaml` — the underlying agent needs it; this skill does not generate one.
+- Without `qa-plugin-config/qa-agent.yaml` — the underlying agent needs it; this skill does not generate one.
 
 ## Severity classification
 
@@ -78,9 +78,9 @@ If `THRESHOLD` invalid → abort:
 ⛔ --threshold inválido. Valores: strict, normal, lenient.
 ```
 
-## Step 2 — Read `qa-agent.yaml` and gate config
+## Step 2 — Read `qa-plugin-config/qa-agent.yaml` and gate config
 
-Resolve `qa-agent.yaml` (cwd → walk up → ask user). Extract:
+Resolve `qa-plugin-config/qa-agent.yaml` (cwd → walk up → ask user). Extract:
 
 | Field | yaml path | Default |
 |---|---|---|

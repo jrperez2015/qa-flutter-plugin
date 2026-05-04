@@ -11,7 +11,7 @@ Functional QA runner for Flutter Android apps. You implement the `/qa-run` comma
 **Invocation examples:**
 - `/qa-run login` — test login (existing test) or generate+persist if new
 - `/qa-run login --auto` — same, no user interaction
-- `/qa-run login --plan=qa-plans/login.md` — use a pre-generated plan from `qa-flutter-test-planner`
+- `/qa-run login --plan=qa-plugin-config/qa-plans/login.md` — use a pre-generated plan from `qa-flutter-test-planner`
 - `/qa-run regresion` — run full regression suite sequentially
 - `/qa-run regresion --auto` — full suite, CI mode
 
@@ -35,7 +35,7 @@ The plan will be loaded in Section C.0 before any semantic resolution.
 
 ## Step 2 — Read configuration
 
-Read `qa-agent.yaml` from the project root using the Read tool. Extract:
+Read `qa-plugin-config/qa-agent.yaml` from the project root using the Read tool. Extract:
 
 | Variable | yaml path |
 |---|---|
@@ -47,7 +47,7 @@ Read `qa-agent.yaml` from the project root using the Read tool. Extract:
 | `RESET_BEFORE_EACH` | `execution.reset_app_before_each` |
 | `BACKEND_TEST_URL` | `backend.test_url` |
 | `REPORTS_DIR` | `reports.output_dir` |
-| `PLAN_DIR` | `planning.test_plan_dir` (optional, default `qa-plans/`) |
+| `PLAN_DIR` | `planning.test_plan_dir` (optional, default `qa-plugin-config/qa-plans/`) |
 | `REQUIRE_PLAN` | `planning.require_plan` (optional, default `false`) |
 
 If `PLAN_PATH` was empty in Step 1 AND `planning.test_plan_dir` is configured, set `PLAN_PATH = {PLAN_DIR}/{FEATURE}.md` if that file exists. Otherwise leave `PLAN_PATH` empty.
@@ -58,10 +58,10 @@ If `REQUIRE_PLAN` is true AND `PLAN_PATH` is empty AND `FEATURE != "regresion"` 
    Genera el plan primero: /qa-plan {FEATURE}
 ```
 
-If `qa-agent.yaml` does not exist → abort:
+If `qa-plugin-config/qa-agent.yaml` does not exist → abort:
 ```
-⛔ qa-agent.yaml no encontrado en la raíz del proyecto.
-   Crea el archivo con la configuración del dispositivo y backend.
+⛔ qa-plugin-config/qa-agent.yaml no encontrado en la raíz del proyecto.
+   Crea el archivo en qa-plugin-config/ con la configuración del dispositivo y backend.
 ```
 
 **Read `pubspec.yaml` once here** — extract `name:` → `PUBSPEC_NAME` and `version:` → `PUBSPEC_VERSION`.
@@ -73,12 +73,12 @@ Execute in order. Each failure aborts the run without executing any tests.
 
 ### 3.1 — Verify .env complete and secure
 
-Read `.env` from the project root. Extract `TEST_EMAIL`, `TEST_PASSWORD`, `API_BASE_URL`.
+Read `qa-plugin-config/.env` from the project root. Extract `TEST_EMAIL`, `TEST_PASSWORD`, `API_BASE_URL`.
 
-If `.env` missing or any field empty → abort:
+If `qa-plugin-config/.env` missing or any field empty → abort:
 ```
-⛔ .env incompleto. Campos requeridos: TEST_EMAIL, TEST_PASSWORD, API_BASE_URL.
-   Copia .env.example a .env y rellena los valores.
+⛔ qa-plugin-config/.env incompleto. Campos requeridos: TEST_EMAIL, TEST_PASSWORD, API_BASE_URL.
+   Copia qa-plugin-config/.env.example a qa-plugin-config/.env y rellena los valores.
 ```
 
 If `BACKEND_TEST_URL` is empty or missing from `qa-agent.yaml` → abort:
