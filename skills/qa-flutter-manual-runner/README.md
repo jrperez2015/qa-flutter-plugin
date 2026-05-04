@@ -69,10 +69,10 @@ reports:
 ```
 
 > **`backend.test_url` es obligatorio.** El skill no ejecuta si este campo está vacío.
-> El pre-flight verifica que `API_BASE_URL` en `qa-plugin-config/.env` coincida exactamente con este valor,
+> El pre-flight verifica que `API_BASE_URL` en `.env` coincida exactamente con este valor,
 > protegiendo datos de producción ante errores de configuración.
 
-### 3. Crear `qa-plugin-config/.env`
+### 3. Crear `.env`
 
 ```
 API_BASE_URL=http://localhost:8080/api
@@ -80,12 +80,12 @@ TEST_EMAIL=qa-user@test.com
 TEST_PASSWORD=your-test-password
 ```
 
-> `qa-plugin-config/.env` nunca se commitea. Agregar a `.gitignore` si no está ya.
+> `.env` nunca se commitea. Agregar a `.gitignore` si no está ya.
 
 ### 4. Agregar a `.gitignore`
 
 ```
-qa-plugin-config/.env
+.env
 qa-plugin-config/qa-reports/
 ```
 
@@ -166,7 +166,7 @@ claude -p "/qa-run regresion --auto" --output-format json
 
 Antes de ejecutar cualquier test, el skill verifica en este orden:
 
-1. **`qa-plugin-config/.env` completo y seguro** — campos requeridos presentes, `API_BASE_URL` coincide con `backend.test_url`
+1. **`.env` completo y seguro** — campos requeridos presentes, `API_BASE_URL` coincide con `backend.test_url`
 2. **Backend disponible** — `GET /health`, si no existe: `POST /login` con las credenciales del `.env`
 3. **Dispositivo activo** — si no hay dispositivo, intenta levantar el primer AVD disponible (timeout 90s)
 4. **`test_runner.dart` existe** — lo crea automáticamente si falta
@@ -258,9 +258,9 @@ Con esta configuración, `API_BASE_URL` apunta al backend en perfil `test` y tod
 
 ```
 <project-root>/
+  .env                                   ← credenciales (excluido de git)
   qa-plugin-config/
-    qa-agent.yaml                        ← config local (excluido de git)
-    .env                                 ← credenciales (excluido de git)
+    qa-agent.yaml                        ← config QA
     qa-reports/                          ← informes generados (excluidos de git)
   integration_test/
     fixtures/

@@ -399,7 +399,7 @@ unit:                             # optional — for unit-generator
   coverage_target: 80
 ```
 
-Plus `qa-plugin-config/.env` at the project:
+Plus `.env` at the project root:
 ```
 TEST_EMAIL=qa-user@test.com
 TEST_PASSWORD=your-test-password
@@ -767,7 +767,7 @@ If you already use the Appium stack (`project.android_stack: "appium"`), the rel
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Agent replies "¿Cuál es la ruta absoluta al archivo qa-plugin-config/qa-agent.yaml?" | yaml not found in cwd or parent | Create `qa-plugin-config/qa-agent.yaml` at project root, or answer with absolute path |
-| "Backend no disponible" pre-flight error | Test backend not running, or `API_BASE_URL` mismatch | Start test backend; verify `qa-plugin-config/.env` matches `backend.test_url` |
+| "Backend no disponible" pre-flight error | Test backend not running, or `API_BASE_URL` mismatch | Start test backend; verify `.env` at project root matches `backend.test_url` |
 | "No hay dispositivos ADB ni AVDs disponibles" | No emulator running and no AVD to launch | Start an emulator manually or create an AVD in Android Studio |
 | Tests pass locally but fail in CI | Flaky timing, screen size, or device state | Check report — look for `TOKEN_RETRY` notes or missing `pumpAndSettle` |
 | `BUILD_FAILED` in web runner | Compile errors in Flutter web target | Run `flutter build web` manually and fix before re-running QA |

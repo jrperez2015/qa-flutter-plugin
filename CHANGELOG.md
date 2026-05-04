@@ -11,10 +11,10 @@ Centralize all QA configuration files under `qa-plugin-config/` in the target Fl
 
 ### Changed
 
-- **All skills and agents** — config resolution updated from project root (`qa-agent.yaml`, `qa-knowledge.yaml`, `.env`, `qa-plans/`, `qa-reports/`) to `qa-plugin-config/` subfolder (`qa-plugin-config/qa-agent.yaml`, etc.). Walk-up logic preserved: cwd → walk up to `pubspec.yaml` sibling → ask user.
+- **All skills and agents** — config resolution updated from project root (`qa-agent.yaml`, `qa-knowledge.yaml`, `qa-plans/`, `qa-reports/`) to `qa-plugin-config/` subfolder. `.env` stays at the project root (it is a project-level file, not plugin-specific). Walk-up logic preserved: cwd → walk up to `pubspec.yaml` sibling → ask user.
 - **`qa-flutter-bootstrap`** — introduces `PROJECT_ROOT` / `YAML_DIR` distinction. `start_cwd` resolves relative to `PROJECT_ROOT` (parent of `qa-plugin-config/`) for backward-compatible relative paths. Bootstrap marker path formula: `{PROJECT_ROOT}/{reports.output_dir}/.qa-bootstrap-marker`.
 - **`qa-flutter-android-runner` / `qa-flutter-web-runner`** — `QA_AGENT_DIR` now points to `{PROJECT_ROOT}/qa-plugin-config`; Appium companion scripts expected at `qa-plugin-config/scripts/`.
-- **`qa-flutter-manual-runner`** — `.env` path: `qa-plugin-config/.env`. `PLAN_DIR` default: `qa-plugin-config/qa-plans/`. Reports default: `qa-plugin-config/qa-reports/`.
+- **`qa-flutter-manual-runner`** — `.env` read from project root (unchanged). `PLAN_DIR` default: `qa-plugin-config/qa-plans/`. Reports default: `qa-plugin-config/qa-reports/`.
 - **`qa-flutter-test-planner`** — plan output default: `qa-plugin-config/qa-plans/<feature>.md`. `PLAN_DIR` default: `qa-plugin-config/qa-plans/`.
 - **`qa-flutter-unit-generator`** — `REPORTS_DIR` default: `qa-plugin-config/qa-reports`.
 - **`qa-flutter-release-gate`** — reads `qa-plugin-config/qa-agent.yaml`.
@@ -33,14 +33,14 @@ Projects upgrading from `≤ 1.30` must run:
 mkdir -p qa-plugin-config
 mv qa-agent.yaml    qa-plugin-config/
 mv qa-knowledge.yaml qa-plugin-config/    # if present
-mv .env             qa-plugin-config/     # if present
 mv qa-plans/        qa-plugin-config/     # if present
 # Update reports.output_dir in qa-agent.yaml to: qa-plugin-config/qa-reports
+# .env stays at the project root — do NOT move it
 ```
 
 Then update `.gitignore`:
 ```
-qa-plugin-config/.env
+.env
 qa-plugin-config/qa-reports/
 ```
 

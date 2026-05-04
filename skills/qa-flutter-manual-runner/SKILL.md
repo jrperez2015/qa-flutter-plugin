@@ -73,12 +73,12 @@ Execute in order. Each failure aborts the run without executing any tests.
 
 ### 3.1 — Verify .env complete and secure
 
-Read `qa-plugin-config/.env` from the project root. Extract `TEST_EMAIL`, `TEST_PASSWORD`, `API_BASE_URL`.
+Read `.env` from the project root. Extract `TEST_EMAIL`, `TEST_PASSWORD`, `API_BASE_URL`.
 
-If `qa-plugin-config/.env` missing or any field empty → abort:
+If `.env` missing or any field empty → abort:
 ```
-⛔ qa-plugin-config/.env incompleto. Campos requeridos: TEST_EMAIL, TEST_PASSWORD, API_BASE_URL.
-   Copia qa-plugin-config/.env.example a qa-plugin-config/.env y rellena los valores.
+⛔ .env incompleto. Campos requeridos: TEST_EMAIL, TEST_PASSWORD, API_BASE_URL.
+   Copia .env.example a .env y rellena los valores.
 ```
 
 If `BACKEND_TEST_URL` is empty or missing from `qa-agent.yaml` → abort:
