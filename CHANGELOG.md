@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.31] — 2026-05-04
+## [1.3.1] — 2026-05-04
 
 Centralize all QA configuration files under `qa-plugin-config/` in the target Flutter project. **Breaking change** — existing projects must migrate files (see Migration guide in README).
 
@@ -23,7 +23,7 @@ Centralize all QA configuration files under `qa-plugin-config/` in the target Fl
 - **`templates/qa-knowledge.yaml`** — install comment updated to `qa-plugin-config/`.
 - **`commands/qa-plan.md`** — output path updated.
 - **README** — Quick start, configuration, troubleshooting, and migration guide updated for new structure.
-- **Plugin manifest** — version bumped to `1.31`.
+- **Plugin manifest** — version bumped to `1.3.1`.
 
 ### Migration
 
