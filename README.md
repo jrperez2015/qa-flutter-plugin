@@ -2,7 +2,7 @@
 
 [![Plugin Validation](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.30-blue.svg)](CHANGELOG.md)
 
 QA plugin for Flutter projects — covers the full testing pyramid (unit/widget/state → integration/E2E → stability) across Android and Web, with a **self-learning autonomous orchestrator** that brings up the backend, boots the device, applies known environment fixes automatically, runs tests, emits an actionable report + JSON artifact, and tears everything down. Designed as a pre-release stability gate.
 
@@ -63,8 +63,9 @@ Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-f
 3. Create `qa-agent.yaml` at your project root (see [Configuration](#configuration--qa-agentyaml)).
 4. Run:
    ```
+   /qa-plan <feature>    # plan first: pantallas, precondiciones, flujos, criterios, riesgos
    /qa-unit <feature>    # unit + widget + state tests (fast, no device)
-   /qa-run  <feature>    # integration tests via flutter_drive
+   /qa-run  <feature> --plan=qa-plans/<feature>.md   # integration tests driven by the plan
    ```
 5. At end of branch, let the orchestrator auto-invoke `qa-stability-agent` for the final QA pass.
 
@@ -91,6 +92,7 @@ Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-f
 
 | Skill | Slash command | Layer | Mechanism | Platform |
 |---|---|---|---|---|
+| `qa-flutter-test-planner` | `/qa-plan <feature>` | Planning (pre-execution) | Semantic discovery + flow inference | Any |
 | `qa-flutter-unit-generator` | `/qa-unit <feature>` | Unit / Widget / State | `flutter test` | Any |
 | `qa-flutter-manual-runner` | `/qa-run <feature>` | Integration / E2E | `flutter drive` + `integration_test` | Android |
 | `qa-flutter-android-runner` | `/qa-flutter-android-runner "<objective>"` | Integration / E2E | Appium + Python orchestrator | Android |
@@ -249,6 +251,15 @@ Full decision matrix: [docs/android-stacks.md](docs/android-stacks.md).
 
 ## Typical flows
 
+### Plan a feature before testing it (recommended for new / multi-screen features)
+```
+/qa-plan <feature>                → produces qa-plans/<feature>.md
+                                    (review pantallas, precondiciones, flujos, criterios, riesgos)
+/qa-run  <feature> --plan=qa-plans/<feature>.md
+                                  → runner consumes the plan instead of guessing scope
+```
+See [Planificación de QA](#planificación-de-qa) below for when planning is worth the extra step.
+
 ### After a feature implementation (manual, during dev)
 ```
 /qa-unit <feature>                → base + middle of pyramid
@@ -269,10 +280,79 @@ Emits a report classifying findings by severity (Critical/High/Medium/Low) and a
 
 ### CI / unattended
 ```bash
+claude -p "/qa-plan <feature> --auto"
 claude -p "/qa-run regresion --auto" --output-format json
 claude -p "/qa-unit <feature> --auto"
 claude -p "/qa-release-gate --auto --threshold=strict" --output-format json
 ```
+
+---
+
+## Planificación de QA
+
+Antes de v1.2 los runners hacían *semantic resolution* en caliente: leían el código en cada invocación para decidir qué pantallas / endpoints tocar. Funciona para features de una sola pantalla, pero deja al QA sin la oportunidad de **revisar el alcance antes** de generar y ejecutar tests, y no captura flujos multi-pantalla (checkout, onboarding, recuperación de contraseña).
+
+`qa-flutter-test-planner` (`/qa-plan`) introduce una fase de planificación explícita que produce un artefacto markdown auditable en `qa-plans/<feature>.md`. Los runners consumen ese plan vía `--plan=<path>`.
+
+### ¿Qué contiene un plan?
+
+| Sección | Contenido |
+|---|---|
+| **1. Scope** | Una descripción del propósito de la feature, derivada de las pages y providers |
+| **2. Pantallas a cubrir** | Tabla con clase, archivo, entry route, próximas rutas, score, MUTANT flag |
+| **3. Precondiciones** | Env vars, backend en perfil de test, usuarios seed, permisos device, dependencias nativas (con `[ ]` para bloqueantes y `[~]` para advisory) |
+| **4. Flujos end-to-end** | Happy paths + casos de error/borde como pasos numerados |
+| **5. Criterios de aceptación** | Resultado esperado verificable por flujo |
+| **6. Riesgos / fuera de scope** | Pantallas excluidas, flujos no inferibles, exposición de datos productivos, deps nativas pendientes |
+
+### Cuándo planificar (y cuándo no)
+
+| Situación | Recomendación |
+|---|---|
+| Primera vez que tocás una feature | ✅ Plan first |
+| Flujo multi-pantalla (checkout, onboarding) | ✅ Plan first |
+| Feature listada en `release_gate.critical_features` | ✅ Plan first (justificación auditable) |
+| Regresión sobre feature estable con test existente | ❌ Run directo — el plan sería redundante |
+| Smoke rápido durante desarrollo | ❌ Run directo |
+| CI / nightly | ✅ Si hay plan, los runners lo usan; si no, fallback a la lógica anterior |
+
+### Configuración — bloque `planning:` en `qa-agent.yaml`
+
+```yaml
+planning:
+  enabled: true                       # default false → backward-compatible
+  test_plan_dir: "qa-plans/"          # dónde se leen / escriben los planes
+  require_plan: false                 # si true, runners abortan sin plan
+  score_threshold: 40                 # score mínimo Layer 1 para incluir una pantalla
+  flow_depth: 3                       # max transiciones del router por flujo
+  aliases:                            # FEATURE → sinónimos para keyword matching
+    "checkout": ["pago", "payment"]
+    "registro": ["signup", "register"]
+  precondition_severity_overrides:
+    "Permiso CAMERA": "advisory"
+```
+
+Sin el bloque `planning:`, el plugin se comporta igual que en v1.1 (los runners hacen semantic resolution en caliente).
+
+### Auto-inyección por `qa-stability-agent`
+
+Si `planning.test_plan_dir` está seteado, el agente busca planes correspondientes a cada feature mencionada en el implementation summary y pasa `--plan=<path>` al runner correspondiente. No hace falta el flag manual para los runs auto-delegados.
+
+Si `planning.require_plan: true` y alguna feature carece de plan, el agente aborta con NO-GO y razón `"missing plan for feature {name}"`.
+
+### Plans son input, reports son output
+
+```
+qa-plans/                              ← commiteable, versionable, editable a mano
+  login.md
+  checkout.md
+test/docs/QA_REPORTS/                  ← gitignored, generado por los runners
+  2026-05-04T14-30-login.md
+```
+
+Los planes se commitean: viven con el código y se editan por PR como cualquier doc. Los reportes son ephemeros: cada run genera uno nuevo.
+
+Más detalle: [skills/qa-flutter-test-planner/README.md](skills/qa-flutter-test-planner/README.md).
 
 ---
 

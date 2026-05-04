@@ -1,7 +1,7 @@
 ---
 name: qa-flutter-manual-runner
-description: Use when running functional QA on a Flutter Android app via flutter_drive (integration_test package). Covers regression of existing integration tests and generation of new ones from semantic resolution of lib/src/pages and lib/src/providers. Requires a real Android device or emulator and a running backend. NOT for Appium-based testing — use qa-flutter-android-runner. NOT for unit/widget/state tests — use qa-flutter-unit-generator. NOT for Flutter web — use qa-flutter-web-runner.
-argument-hint: "<feature-name> [--auto]"
+description: Use when running functional QA on a Flutter Android app via flutter_drive (integration_test package). Covers regression of existing integration tests and generation of new ones from semantic resolution of lib/src/pages and lib/src/providers (or from a pre-generated plan via --plan). Requires a real Android device or emulator and a running backend. NOT for Appium-based testing — use qa-flutter-android-runner. NOT for unit/widget/state tests — use qa-flutter-unit-generator. NOT for Flutter web — use qa-flutter-web-runner.
+argument-hint: "<feature-name> [--auto] [--plan=<path>]"
 ---
 
 # qa-flutter-manual-runner
@@ -11,19 +11,27 @@ Functional QA runner for Flutter Android apps. You implement the `/qa-run` comma
 **Invocation examples:**
 - `/qa-run login` — test login (existing test) or generate+persist if new
 - `/qa-run login --auto` — same, no user interaction
+- `/qa-run login --plan=qa-plans/login.md` — use a pre-generated plan from `qa-flutter-test-planner`
 - `/qa-run regresion` — run full regression suite sequentially
 - `/qa-run regresion --auto` — full suite, CI mode
 
 ## Step 1 — Parse arguments
 
 Extract from the invocation string:
-- `FEATURE` = text before `--auto`, trimmed and lowercased
+- `FEATURE` = first positional arg (text before any `--flag`), trimmed and lowercased
 - `AUTO_MODE` = true if `--auto` present, false otherwise
+- `PLAN_PATH` = value after `--plan=` if present, else empty
 
 If AUTO_MODE is true, print immediately:
 ```
 Ejecutando en modo automático — sin interacción durante el run.
 ```
+
+If `PLAN_PATH` is set, print:
+```
+Usando plan: {PLAN_PATH}
+```
+The plan will be loaded in Section C.0 before any semantic resolution.
 
 ## Step 2 — Read configuration
 
@@ -39,6 +47,16 @@ Read `qa-agent.yaml` from the project root using the Read tool. Extract:
 | `RESET_BEFORE_EACH` | `execution.reset_app_before_each` |
 | `BACKEND_TEST_URL` | `backend.test_url` |
 | `REPORTS_DIR` | `reports.output_dir` |
+| `PLAN_DIR` | `planning.test_plan_dir` (optional, default `qa-plans/`) |
+| `REQUIRE_PLAN` | `planning.require_plan` (optional, default `false`) |
+
+If `PLAN_PATH` was empty in Step 1 AND `planning.test_plan_dir` is configured, set `PLAN_PATH = {PLAN_DIR}/{FEATURE}.md` if that file exists. Otherwise leave `PLAN_PATH` empty.
+
+If `REQUIRE_PLAN` is true AND `PLAN_PATH` is empty AND `FEATURE != "regresion"` → abort:
+```
+⛔ planning.require_plan está activado y no existe plan para '{FEATURE}'.
+   Genera el plan primero: /qa-plan {FEATURE}
+```
 
 If `qa-agent.yaml` does not exist → abort:
 ```
@@ -203,6 +221,24 @@ After all features: generate summary → **[Section F]**.
 
 ## Section C — New Feature Test
 
+### C.0 — Plan-driven path (skip C.1–C.2 if plan provided)
+
+If `PLAN_PATH` (set in Step 1 or 2) is non-empty:
+
+1. Read `PLAN_PATH` with the Read tool.
+2. Verify the YAML frontmatter has `feature: {FEATURE}` (case-insensitive). If mismatched → abort:
+   ```
+   ⛔ Plan {PLAN_PATH} corresponde a feature '{plan_feature}', no a '{FEATURE}'.
+   ```
+3. Parse the markdown:
+   - **Section 2 — Pantallas a cubrir** (table) → list of `(page_class, page_file, entry_route)`. Treat each row as one candidate. This **replaces** Layer 1+3 of C.1.
+   - **Section 3 — Precondiciones** → list of `(description, blocker)`. For each `[ ]` (blocker) item, before continuing verify it is satisfied. If not, abort listing the unmet blockers (in interactive mode, ask the user to confirm; in `--auto` mode, abort).
+   - **Section 4 — Flujos end-to-end** → list of flows. Each flow's steps become test step seeds for C.3.2 generation.
+4. Set `SELECTED` = the candidates from Section 2 (already deduplicated by the planner).
+5. Skip C.1 and C.2 entirely. Jump to **C.3** for generation.
+
+If `PLAN_PATH` is empty, fall through to C.1 (legacy on-the-fly resolution — unchanged behavior).
+
 ### C.1 — Semantic resolution (three layers)
 
 **IMPORTANT — Grep before Read:** Do NOT read all dart files upfront. Use Grep to identify
@@ -283,6 +319,8 @@ For each candidate in `SELECTED`, **sequentially**:
 **C.3.2 — Generate test**
 
 Analyze `page_file` and `provider_file` to identify navigation path, widget finders (Keys preferred, else `find.text`, `find.byType`, `find.widgetWithText`), happy path steps, and at least one error case.
+
+**If `PLAN_PATH` was loaded in C.0:** use the flows declared in Section 4 of the plan as the source of truth for steps. Each plan step is a Spanish-language directive (e.g. "Ingresar TEST_EMAIL en Key('login.email')"); translate it into the corresponding `tester.enterText` / `tester.tap` / `await tester.pumpAndSettle()` Dart calls. Error flows from Section 4.E become the `error case` test groups. Page-source analysis still runs to resolve finder details (Keys, widget types) but does not invent new steps.
 
 **Finder pitfalls (verificado 2026-04-24):**
 - `ElevatedButton.icon(...)` retorna un subtipo privado (`_ElevatedButtonWithIcon`). `find.byType(ElevatedButton)` devuelve 0 matches aunque el botón esté en pantalla. Lo mismo aplica a `.icon` de `TextButton`, `OutlinedButton`, `FilledButton`.

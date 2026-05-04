@@ -163,6 +163,29 @@ else → write current pid + timestamp, register cleanup on exit
 
 ---
 
+### G8 — Planning artifact before execution 🟠 High
+
+**Problem.** Until v1.2 the runners did *semantic resolution* on the fly inside `qa-flutter-manual-runner` § C.1 to decide what to test. That logic only handles single-page features and gives the QA no chance to review the scope before tests are generated and executed. Multi-screen flows (checkout, onboarding, password recovery → reset) are missed entirely, preconditions surface only at runtime as cryptic failures, and there is no auditable artifact justifying the coverage decisions for compliance / release-gate reviews.
+
+**Proposal — extract planning into its own skill that produces a markdown+YAML artifact:**
+
+```
+/qa-plan login            → qa-plans/login.md
+                            (pantallas, precondiciones, flujos, criterios, riesgos)
+/qa-run login --plan=qa-plans/login.md
+                          → runner consumes the plan instead of guessing scope
+```
+
+Plans are committed alongside the code; reports stay in `reports.output_dir` (gitignored).
+
+**Where to implement:** new skill `qa-flutter-test-planner` reuses Layer 1+2+3 logic from manual-runner § C.1 generalized to N screens. Runners gain a `--plan=<path>` flag that, when present, replaces their on-the-fly resolution. Stability agent gains a Step 2.5 that auto-injects the flag based on `planning.test_plan_dir`.
+
+**Backward compatibility.** `planning:` block in yaml is optional; without it, runners behave exactly as in v1.1.
+
+**Status:** ✅ Implemented 2026-05-04 via new skill `qa-flutter-test-planner` + `--plan=<path>` flag on all three runners + Step 2.5 in `qa-stability-agent`. Templates live under `skills/qa-flutter-test-planner/references/`. Plan format is markdown body with YAML frontmatter (schema v1).
+
+---
+
 ### G7 — Cost control for unattended Claude runs 🔵 Low
 
 **Problem.** `claude -p "/qa-release-gate --auto"` consumes tokens for every run. Nightly cron = 30+ runs per month. The gate itself is cheap (reads reports and classifies), but the delegated skills dispatch sub-agents.
@@ -192,6 +215,7 @@ Surface aggregates in a dashboard. If cost is a concern, move to hybrid: run the
 | G5 — Waiver workflow | 🟡 Medium | Low | Audit / compliance |
 | G6 — Run idempotency | 🟡 Medium | Low | Safe high-frequency schedules |
 | G7 — Cost tracking | 🔵 Low | Low | Scale |
+| G8 — Planning artifact | 🟠 High | Medium | Multi-screen scope, auditable coverage decisions |
 
 ## Suggested order of implementation
 
