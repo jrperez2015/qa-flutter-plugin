@@ -59,13 +59,14 @@ claude -p "/qa-stability-agent --dry-run" # verificar config sin ejecutar
 ## Flujo completo de ejecución
 
 ```
-Step 0a → Knowledge Preflight   (qa-knowledge-manager preflight)
-Step 1  → Leer configuración    (qa-agent.yaml)
-Step 2  → Seleccionar stack     (flutter_drive | appium | web | unit)
-Step 3  → Ejecutar runner       (skill correspondiente)
-Step 4  → Clasificar resultados (qa-flutter-release-gate)
-Step 0b → Knowledge Learn       (qa-knowledge-manager learn)
-Step 5  → Emitir veredicto      (GO / NO-GO)
+Step 0a  → Knowledge Preflight   (qa-knowledge-manager preflight)
+Step 1   → Leer configuración    (qa-agent.yaml)
+Step 2   → Seleccionar stack     (flutter_drive | appium | web | unit)
+Step 2.5 → Resolve plans         (si planning.enabled — opcional)
+Step 3   → Ejecutar runner       (skill correspondiente)
+Step 4   → Clasificar resultados (qa-flutter-release-gate)
+Step 0b  → Knowledge Learn       (qa-knowledge-manager learn)
+Step 5   → Emitir veredicto      (GO / NO-GO)
 ```
 
 ---
@@ -110,6 +111,12 @@ Leer `qa-agent.yaml` en el directorio actual. Validar campos requeridos:
 
 Si falta algún campo requerido → error inmediato, no continuar.
 
+Capturar campos opcionales para uso en steps posteriores:
+- `post_run.include_unit` — si `true`, correr unit coverage tras el runner principal
+- `planning.enabled` — si `true`, activar Step 2.5
+- `planning.test_plan_dir` — directorio de planes (default: `qa-plans/`)
+- `planning.require_plan` — si `true`, abortar ante features sin plan
+
 ---
 
 ## Step 2 — Seleccionar stack
@@ -128,50 +135,70 @@ post_run.include_unit == true (siempre que aplique):
 
 ---
 
+## Step 2.5 — Resolve plans (opcional)
+
+Ejecutar solo si `planning.enabled` es `true`.
+
+1. Construir `FEATURES_TO_TEST` a partir del implementation summary recibido (separar por comas / saltos de línea; lowercase + slug).
+2. Para cada feature, verificar si `{planning.test_plan_dir}/{feature}.md` existe.
+3. Construir `PLAN_MAP = { feature: plan_path }` con los matches encontrados.
+
+Si hay features sin plan en `PLAN_MAP`:
+
+→ Informar al usuario:
+  ```
+  ⚠️ PLANES FALTANTES
+  Las siguientes features tienen planning.enabled pero no tienen plan:
+    - {feature_1}
+    - {feature_2}
+  Opciones:
+    (a) Detener y crear los planes primero
+    (b) Continuar con resolución legacy para esas features
+  ```
+
+Si `planning.require_plan` es `true`:
+- Solo opción (a) disponible — no hay fallback.
+- En modo `--auto`: mostrar los comandos `/qa-plan` faltantes y salir con código 1. No ejecutar Steps 3–4, 0b ni 5.
+
+Si `planning.require_plan` es `false` (default):
+- Ambas opciones disponibles.
+- En modo `--auto`: continuar con fallback legacy para las features sin plan (loggear warning).
+
+Si el usuario elige (a):
+- Mostrar los comandos a ejecutar antes de reintentar el run:
+  ```
+  /qa-plan {feature_1}
+  /qa-plan {feature_2}
+  ```
+- Salir sin ejecutar Steps 3–4 ni Steps 0b/5 (no hay run que reportar).
+
+Si el usuario elige (b):
+- Continuar a Step 3 con fallback legacy para las features sin plan.
+
+---
+
 ## Step 3 — Ejecutar runner
 
-Invocar el skill seleccionado. Durante la ejecución:
+Si `PLAN_MAP` es non-empty, pasar `--plan` por feature antes de invocar:
+- `qa-flutter-manual-runner` (modo single-feature): invocar una vez por feature en `PLAN_MAP` con `--plan=<path>`. Features sin plan → invocar con la lógica `regresion` legacy.
+- `qa-flutter-android-runner`: pasar el PLAN_MAP dentro del objective string (e.g. `"login (plan=qa-plans/login.md), signup (plan=qa-plans/signup.md)"`); el runner parsea las anotaciones `--plan=`.
+- `qa-flutter-web-runner`: pasar `--plan=<path>` del plan más relevante (omitir si no hay plan para el área impactada).
 
-- Monitorear stdout/stderr del runner
+Invocar via el Skill tool. Capturar la ruta del reporte generado.
+
+Durante la ejecución, monitorear stdout/stderr:
 - Si se detecta un error que coincide con algún patrón de `qa-knowledge.yaml`:
   - Log: `[KNOWLEDGE] Patrón K0XX detectado durante el run`
   - Si `auto_apply: true` y no fue aplicado en el preflight: intentar aplicar la solución
   - Si la solución se aplica exitosamente: reintentar el step fallido (máximo 1 reintento)
   - Registrar el intento para que `learn` lo procese
 
-From the yaml:
-- `project.platform` — `"web"` or `"android"` (default: `"android"` if absent)
-- `project.android_stack` — `"appium"` or `"flutter_drive"` (default: `"flutter_drive"` if absent)
-- `post_run.include_unit` — optional boolean; if `true`, run unit coverage after the main runner
-- `planning.test_plan_dir` — optional path; if set, look up plans for features in this directory (default: `qa-plans/`)
-- `planning.require_plan` — optional boolean; if `true`, abort routing for features lacking a plan (default: `false`)
-
-### 2.5. Resolve plans (optional)
-
-If `planning.test_plan_dir` is set:
-
-1. Build a list of `FEATURES_TO_TEST` from the implementation summary the agent received (split by commas / line breaks; lowercase + slug).
-2. For each feature, check if `{planning.test_plan_dir}/{feature}.md` exists.
-3. Build `PLAN_MAP = { feature: plan_path }` for the matches.
-
-If `planning.require_plan` is `true`:
-- For any feature in `FEATURES_TO_TEST` missing a plan → abort. Return verdict `FAIL` with reason: `"missing plan for feature(s): {list}. Run /qa-plan {feature} first."` Skip Steps 3–4; still run Step 5 (teardown).
-
-If `planning.require_plan` is `false` (default):
-- Features without a plan fall back to the runner's on-the-fly resolution (legacy behavior). Continue.
 ---
 
 ## Step 4 — Clasificar resultados
 
 Invocar `/qa-flutter-release-gate` con el reporte generado por el runner.
 Capturar el veredicto: GO | NO-GO | CONDITIONAL.
-
-If `PLAN_MAP` is non-empty, append `--plan={path}` to the runner invocation **per feature**:
-- For `qa-flutter-manual-runner` (single-feature mode): invoke once per feature in `PLAN_MAP` with `--plan=<path>`. For features without a plan, use legacy `regresion` invocation.
-- For `qa-flutter-android-runner`: pass the PLAN_MAP as part of the objective string (e.g. `"login (plan=qa-plans/login.md), signup (plan=qa-plans/signup.md)"`); the runner will parse `--plan=` annotations.
-- For `qa-flutter-web-runner`: pass `--plan=<path>` for the most relevant plan (or omit if no plan exists for the impacted area).
-
-Invoke via the Skill tool. Capture the returned report path.
 
 ---
 

@@ -336,7 +336,7 @@ Sin el bloque `planning:`, el plugin se comporta igual que en v1.1 (los runners 
 
 ### Auto-inyección por `qa-stability-agent`
 
-Si `planning.test_plan_dir` está seteado, el agente busca planes correspondientes a cada feature mencionada en el implementation summary y pasa `--plan=<path>` al runner correspondiente. No hace falta el flag manual para los runs auto-delegados.
+Si `planning.enabled: true`, el agente busca planes correspondientes a cada feature mencionada en el implementation summary y pasa `--plan=<path>` al runner correspondiente. No hace falta el flag manual para los runs auto-delegados.
 
 Si `planning.require_plan: true` y alguna feature carece de plan, el agente aborta con NO-GO y razón `"missing plan for feature {name}"`.
 

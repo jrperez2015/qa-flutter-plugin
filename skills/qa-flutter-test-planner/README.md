@@ -160,7 +160,7 @@ Without `--plan`, runners fall back to their existing on-the-fly logic. **Backwa
 
 ## Auto-injection by `qa-stability-agent`
 
-If `planning.test_plan_dir` is set in `qa-agent.yaml`, the stability agent automatically looks for plans matching the features in the implementation summary and passes `--plan=<path>` to the runner. No manual `--plan` flag needed for auto-delegated runs.
+If `planning.enabled: true` in `qa-agent.yaml`, the stability agent automatically looks for plans matching the features in the implementation summary and passes `--plan=<path>` to the runner. No manual `--plan` flag needed for auto-delegated runs.
 
 If a feature has no plan and `planning.require_plan: true`, the agent aborts with NO-GO and reason "missing plan for feature `{name}`".
 
