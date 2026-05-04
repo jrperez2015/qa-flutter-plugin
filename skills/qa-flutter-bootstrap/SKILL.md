@@ -16,7 +16,7 @@ Owner of infrastructure lifecycle for autonomous QA runs. Brings up backend + de
 ## Scope
 
 This skill:
-- ✅ Reads `autonomous.*` block from `qa-agent.yaml`.
+- ✅ Reads `autonomous.*` block from `qa-plugin-config/qa-agent.yaml`.
 - ✅ Starts backend via `start_cmd` and waits on `health_url`.
 - ✅ Verifies / boots device via `autonomous.device.boot_avd`.
 - ✅ Writes a marker file that functions as both teardown state and run lock.
@@ -59,11 +59,11 @@ autonomous:
     boot_timeout_seconds: 90
 ```
 
-**Resolve `autonomous.backend.start_cwd` relative to the directory containing `qa-agent.yaml`**, not the shell's cwd.
+**Resolve `autonomous.backend.start_cwd` relative to `PROJECT_ROOT`** (the directory containing `pubspec.yaml`, parent of `qa-plugin-config/`), not the shell's cwd and not relative to the yaml file location.
 
 ## Marker file
 
-Path: `{reports.output_dir}/.qa-bootstrap-marker` (default `qa-reports/.qa-bootstrap-marker`).
+Path: `{PROJECT_ROOT}/{reports.output_dir}/.qa-bootstrap-marker` (default `qa-plugin-config/qa-reports/.qa-bootstrap-marker`).
 
 Schema:
 
@@ -99,14 +99,15 @@ QA_BOOTSTRAP_MODE={MODE}
 QA_BOOTSTRAP_CALLER={CALLER}
 ```
 
-## Step 2 — Resolve `qa-agent.yaml`
+## Step 2 — Resolve `qa-plugin-config/qa-agent.yaml`
 
 Follow the same resolution as the rest of the plugin:
-1. `./qa-agent.yaml` in cwd.
-2. Walk up from cwd until finding a `pubspec.yaml` sibling, then check for `qa-agent.yaml` there.
+1. `./qa-plugin-config/qa-agent.yaml` in cwd.
+2. Walk up from cwd until finding a `pubspec.yaml` sibling, then check for `qa-plugin-config/qa-agent.yaml` there.
 3. If interactive, ask the user. If `--auto` context implied (CALLER != standalone) and not found → abort.
 
-Let `YAML_DIR` = directory containing the resolved yaml.
+Let `YAML_DIR` = directory containing the resolved yaml (= `{PROJECT_ROOT}/qa-plugin-config`).
+Let `PROJECT_ROOT` = parent of `YAML_DIR` (= directory containing `pubspec.yaml`).
 
 ## Step 3 — Branch by MODE
 
@@ -119,7 +120,7 @@ Let `YAML_DIR` = directory containing the resolved yaml.
 
 ### U.1 — Lock / composition check
 
-Let `MARKER_PATH` = `{YAML_DIR}/{reports.output_dir}/.qa-bootstrap-marker` (default `qa-reports/.qa-bootstrap-marker`).
+Let `MARKER_PATH` = `{PROJECT_ROOT}/{reports.output_dir}/.qa-bootstrap-marker` (default `qa-plugin-config/qa-reports/.qa-bootstrap-marker`).
 
 If marker exists:
 1. Read `caller` and `pid_ward` from it.
@@ -272,9 +273,9 @@ The Appium stack owns its own bootstrap implementation in the user's companion `
 1. Performs U.1 (lock check) — shared for both stacks.
 2. Invokes `scripts/bootstrap.py` with `--marker={MARKER_PATH}` arg. Example:
    ```bash
-   cd {QA_AGENT_DIR} && python scripts/bootstrap.py qa-agent.yaml --marker={MARKER_PATH}
+   cd {YAML_DIR} && python scripts/bootstrap.py qa-plugin-config/qa-agent.yaml --marker={MARKER_PATH}
    ```
-   Where `QA_AGENT_DIR` is the directory that contains `qa-agent.yaml` (which must also contain `scripts/bootstrap.py` per Appium stack requirements — see `docs/references/appium-bootstrap-contract.md`).
+   Where `YAML_DIR` is `{PROJECT_ROOT}/qa-plugin-config` (which must also contain `scripts/bootstrap.py` per Appium stack requirements — see `docs/references/appium-bootstrap-contract.md`).
 3. If `bootstrap.py` exits non-zero → abort with its stderr in the error message. Do NOT write a marker (bootstrap.py should have written one before exiting with success).
 4. On success, verify `{MARKER_PATH}` exists with valid schema. If not → abort with contract violation notice (the user's `bootstrap.py` is outdated; point them to `docs/references/appium-bootstrap-contract.md`).
 5. Emit the same stdout as U.6.
@@ -359,7 +360,7 @@ Exit 0 (even on `TEARDOWN_FAILED` — the caller uses the status line, not exit 
 
 1. Invoke:
    ```bash
-   cd {QA_AGENT_DIR} && python scripts/teardown.py qa-agent.yaml --marker={MARKER_PATH}
+   cd {YAML_DIR} && python scripts/teardown.py qa-plugin-config/qa-agent.yaml --marker={MARKER_PATH}
    ```
 2. On exit 0 → emit the stdout from D.7 based on what teardown.py reports (it should delete the marker or mark `teardown_failed`).
 3. On non-zero exit → keep marker with `teardown_failed: true`; emit `QA_BOOTSTRAP_STATUS=TEARDOWN_FAILED`.
@@ -372,7 +373,7 @@ Same fallback for pre-contract `teardown.py` as UP-APPIUM: if `--marker` flag is
 
 | Mistake | Fix |
 |---|---|
-| `autonomous.backend.start_cwd` relative to shell cwd instead of yaml dir | Skill resolves relative to yaml directory. Document in README. |
+| `autonomous.backend.start_cwd` relative to yaml dir instead of project root | Skill resolves relative to PROJECT_ROOT (parent of `qa-plugin-config/`). |
 | Using `pkill -f java` as `stop_cmd` | Too broad — kills unrelated java. Use specific pattern (artifact name, port, etc.) or let skill fallback to `kill {backend.pid}`. |
 | `health_url` that returns 200 before DB migrations are done | Use a discriminating endpoint (e.g. one that verifies DB connectivity). |
 | Running `--up` twice without `--down` | Marker lock aborts the second. |

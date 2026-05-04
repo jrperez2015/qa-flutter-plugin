@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31] — 2026-05-04
+
+Centralize all QA configuration files under `qa-plugin-config/` in the target Flutter project. **Breaking change** — existing projects must migrate files (see Migration guide in README).
+
+### Changed
+
+- **All skills and agents** — config resolution updated from project root (`qa-agent.yaml`, `qa-knowledge.yaml`, `.env`, `qa-plans/`, `qa-reports/`) to `qa-plugin-config/` subfolder (`qa-plugin-config/qa-agent.yaml`, etc.). Walk-up logic preserved: cwd → walk up to `pubspec.yaml` sibling → ask user.
+- **`qa-flutter-bootstrap`** — introduces `PROJECT_ROOT` / `YAML_DIR` distinction. `start_cwd` resolves relative to `PROJECT_ROOT` (parent of `qa-plugin-config/`) for backward-compatible relative paths. Bootstrap marker path formula: `{PROJECT_ROOT}/{reports.output_dir}/.qa-bootstrap-marker`.
+- **`qa-flutter-android-runner` / `qa-flutter-web-runner`** — `QA_AGENT_DIR` now points to `{PROJECT_ROOT}/qa-plugin-config`; Appium companion scripts expected at `qa-plugin-config/scripts/`.
+- **`qa-flutter-manual-runner`** — `.env` path: `qa-plugin-config/.env`. `PLAN_DIR` default: `qa-plugin-config/qa-plans/`. Reports default: `qa-plugin-config/qa-reports/`.
+- **`qa-flutter-test-planner`** — plan output default: `qa-plugin-config/qa-plans/<feature>.md`. `PLAN_DIR` default: `qa-plugin-config/qa-plans/`.
+- **`qa-flutter-unit-generator`** — `REPORTS_DIR` default: `qa-plugin-config/qa-reports`.
+- **`qa-flutter-release-gate`** — reads `qa-plugin-config/qa-agent.yaml`.
+- **`qa-knowledge-manager`** — knowledge file path: `qa-plugin-config/qa-knowledge.yaml`.
+- **`qa-stability-agent`** — all internal references updated to `qa-plugin-config/` paths.
+- **`templates/qa-knowledge.yaml`** — install comment updated to `qa-plugin-config/`.
+- **`commands/qa-plan.md`** — output path updated.
+- **README** — Quick start, configuration, troubleshooting, and migration guide updated for new structure.
+- **Plugin manifest** — version bumped to `1.31`.
+
+### Migration
+
+Projects upgrading from `≤ 1.30` must run:
+
+```bash
+mkdir -p qa-plugin-config
+mv qa-agent.yaml    qa-plugin-config/
+mv qa-knowledge.yaml qa-plugin-config/    # if present
+mv .env             qa-plugin-config/     # if present
+mv qa-plans/        qa-plugin-config/     # if present
+# Update reports.output_dir in qa-agent.yaml to: qa-plugin-config/qa-reports
+```
+
+Then update `.gitignore`:
+```
+qa-plugin-config/.env
+qa-plugin-config/qa-reports/
+```
+
+---
+
 ## [1.30] — 2026-05-04
 
 QA planning layer. Closes roadmap gap **G8** (planning artifact). Backward-compatible — runners keep their existing on-the-fly behavior when no plan is provided.

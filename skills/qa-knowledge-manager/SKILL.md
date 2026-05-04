@@ -7,25 +7,25 @@ argument-hint: "[preflight | learn | register | report]"
 # qa-knowledge-manager
 
 Gestión del ciclo completo de autoaprendizaje del QA autónomo.  
-Lee, aplica y actualiza `qa-knowledge.yaml` en el proyecto Flutter activo.
+Lee, aplica y actualiza `qa-plugin-config/qa-knowledge.yaml` en el proyecto Flutter activo.
 
 **Invocation examples:**
 - `/qa-knowledge-manager preflight` — antes del run; detecta y aplica soluciones conocidas
-- `/qa-knowledge-manager learn` — tras el run; registra errores nuevos en qa-knowledge.yaml
+- `/qa-knowledge-manager learn` — tras el run; registra errores nuevos en qa-plugin-config/qa-knowledge.yaml
 - `/qa-knowledge-manager register` — registro manual de un error/solución conocida
 - `/qa-knowledge-manager report` — estado actual de la base de conocimiento
 
 ## Scope
 
 This skill:
-- ✅ Reads and applies entries from `qa-knowledge.yaml` before a run (preflight).
+- ✅ Reads and applies entries from `qa-plugin-config/qa-knowledge.yaml` before a run (preflight).
 - ✅ Scans run output for new errors and drafts entries with user confirmation (learn).
 - ✅ Supports manual registration of known errors and their solutions (register).
 - ✅ Reports the current state of the knowledge base (report).
 
 This skill does NOT:
 - Run tests — delegates to runner skills via `qa-stability-agent`.
-- Modify plugin files — all fixes live in the project's `qa-knowledge.yaml`, not in the plugin.
+- Modify plugin files — all fixes live in the project's `qa-plugin-config/qa-knowledge.yaml`, not in the plugin.
 - Apply solutions silently — always confirms with the user before writing new entries.
 - Block the main run on failure — both preflight and learn are non-fatal wrappers.
 
@@ -33,15 +33,15 @@ This skill does NOT:
 
 - Automatically via `qa-stability-agent` (Steps 0a and 0b) — no need to invoke manually in normal runs.
 - Standalone `preflight` to check environment state before a manual test session.
-- Standalone `learn` to backfill `qa-knowledge.yaml` from a run that completed without the agent.
+- Standalone `learn` to backfill `qa-plugin-config/qa-knowledge.yaml` from a run that completed without the agent.
 - `register` to document a known environment fix before it is observed in a real run.
 - `report` for a quick audit of what the knowledge base contains.
 
 ## When NOT to use
 
 - As a replacement for `qa-stability-agent` — this skill only manages knowledge, not the full QA lifecycle.
-- When `qa-knowledge.yaml` does not exist and the project hasn't opted into autoaprendizaje — the skill will inform and no-op cleanly.
-- For modifying plugin behavior — fixes specific to a project's environment belong in `qa-knowledge.yaml`, not in skill files.
+- When `qa-plugin-config/qa-knowledge.yaml` does not exist and the project hasn't opted into autoaprendizaje — the skill will inform and no-op cleanly.
+- For modifying plugin behavior — fixes specific to a project's environment belong in `qa-plugin-config/qa-knowledge.yaml`, not in skill files.
 
 ---
 
@@ -69,14 +69,14 @@ y aplicar soluciones automáticas, acortando el tiempo total de ejecución.
 **Paso 1 — Localizar qa-knowledge.yaml**
 
 Buscar en este orden:
-1. Directorio actual (raíz del proyecto Flutter)
-2. Ruta indicada en `qa-agent.yaml` bajo `knowledge.path`
+1. `qa-plugin-config/qa-knowledge.yaml` en el directorio actual (raíz del proyecto Flutter)
+2. Ruta indicada en `qa-plugin-config/qa-agent.yaml` bajo `knowledge.path`
 3. Si no existe: informar al usuario y ofrecer crear uno desde el template
 
 ```
-Si no existe qa-knowledge.yaml:
-  → Avisar: "No se encontró qa-knowledge.yaml. Crear uno desde el template con:
-     cp ~/.claude/plugins/local/qa-flutter/templates/qa-knowledge.yaml ./qa-knowledge.yaml"
+Si no existe qa-plugin-config/qa-knowledge.yaml:
+  → Avisar: "No se encontró qa-plugin-config/qa-knowledge.yaml. Crear uno desde el template con:
+     cp ~/.claude/plugins/local/qa-flutter/templates/qa-knowledge.yaml ./qa-plugin-config/qa-knowledge.yaml"
   → Continuar el run sin preflight (no bloquear)
 ```
 
@@ -162,7 +162,7 @@ con lo aprendido (errores sin solución conocida o soluciones encontradas dinám
 
 **Paso 1 — Localizar el reporte del run reciente**
 
-Buscar en `reports.output_dir` (definido en `qa-agent.yaml`) el reporte más reciente:
+Buscar en `reports.output_dir` (definido en `qa-plugin-config/qa-agent.yaml`) el reporte más reciente:
 - Archivos `.md` o `.json` con timestamp del run actual
 - Si no existe reporte: usar el output de la sesión actual
 
@@ -206,7 +206,7 @@ Para cada error nuevo:
    [mostrar el bloque YAML del borrador]
    Opciones: (a) Registrar tal cual  (b) Editar antes de registrar  (c) Ignorar
 
-   → Solo escribir en qa-knowledge.yaml tras confirmación explícita del usuario
+   → Solo escribir en qa-plugin-config/qa-knowledge.yaml tras confirmación explícita del usuario
    → Con registered_by: "agent"
 
 5. Si el usuario elige ignorar: no escribir nada. Si el error se repite en runs
@@ -314,14 +314,14 @@ Solución:
     last_result: null
 ```
 
-**Paso 3 — Insertar en qa-knowledge.yaml**
+**Paso 3 — Insertar en qa-plugin-config/qa-knowledge.yaml**
 
 Insertar antes del marcador `# [AGENT_ENTRIES_START]`.
 
 **Paso 4 — Confirmar**
 
 ```
-✅ Entrada K0XX registrada en qa-knowledge.yaml
+✅ Entrada K0XX registrada en qa-plugin-config/qa-knowledge.yaml
    Descripción: <descripción>
    Solución automática: <sí/no>
    La solución se aplicará en el próximo preflight si se detecta el patrón.
@@ -338,7 +338,7 @@ Dar visibilidad del estado actual de la base de conocimiento.
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
-║  QA KNOWLEDGE REPORT — qa-knowledge.yaml                      ║
+║  QA KNOWLEDGE REPORT — qa-plugin-config/qa-knowledge.yaml     ║
 ║  Actualizado: YYYY-MM-DD  |  Total entradas: N                ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Por categoría:                                               ║
@@ -392,7 +392,7 @@ Dar visibilidad del estado actual de la base de conocimiento.
 |---|---|---|
 | `QA_AVD_NAME` | Nombre del AVD a lanzar | `Pixel_5_API_33` |
 | `QA_BACKEND_HEALTH` | URL del health check del backend | `http://localhost:8080/api/health` |
-| `QA_KNOWLEDGE_PATH` | Ruta alternativa a qa-knowledge.yaml | `./qa-knowledge.yaml` |
+| `QA_KNOWLEDGE_PATH` | Ruta alternativa a qa-knowledge.yaml | `./qa-plugin-config/qa-knowledge.yaml` |
 
 ---
 

@@ -2,7 +2,7 @@
 
 [![Plugin Validation](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml/badge.svg)](https://github.com/jrperez2015/qa-flutter-plugin/actions/workflows/validate-plugin.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.30-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.31-blue.svg)](CHANGELOG.md)
 
 QA plugin for Flutter projects — covers the full testing pyramid (unit/widget/state → integration/E2E → stability) across Android and Web, with a **self-learning autonomous orchestrator** that brings up the backend, boots the device, applies known environment fixes automatically, runs tests, emits an actionable report + JSON artifact, and tears everything down. Designed as a pre-release stability gate.
 
@@ -60,12 +60,12 @@ Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-f
 
 1. Install the plugin (copy `qa-flutter/` into `~/.claude/plugins/local/` or load via marketplace).
 2. Install prerequisites for your stack (see [Prerequisites](#prerequisites)).
-3. Create `qa-agent.yaml` at your project root (see [Configuration](#configuration--qa-agentyaml)).
+3. Create `qa-plugin-config/qa-agent.yaml` in your project (see [Configuration](#configuration--qa-agentyaml)).
 4. Run:
    ```
    /qa-plan <feature>    # plan first: pantallas, precondiciones, flujos, criterios, riesgos
    /qa-unit <feature>    # unit + widget + state tests (fast, no device)
-   /qa-run  <feature> --plan=qa-plans/<feature>.md   # integration tests driven by the plan
+   /qa-run  <feature> --plan=qa-plugin-config/qa-plans/<feature>.md   # integration tests driven by the plan
    ```
 5. At end of branch, let the orchestrator auto-invoke `qa-stability-agent` for the final QA pass.
 
@@ -108,13 +108,13 @@ Restart Claude Code. Skills (`qa-flutter:qa-flutter-bootstrap`, `qa-flutter:qa-f
 
 ### What it does
 
-Entry point for **post-implementation QA**. Reads `qa-agent.yaml`, detects the platform and Android stack, then runs the full knowledge-augmented cycle:
+Entry point for **post-implementation QA**. Reads `qa-plugin-config/qa-agent.yaml`, detects the platform and Android stack, then runs the full knowledge-augmented cycle:
 
-1. **Knowledge preflight** (Step 0a) — checks `qa-knowledge.yaml` for known environment issues and applies automatic fixes before the run starts.
+1. **Knowledge preflight** (Step 0a) — checks `qa-plugin-config/qa-knowledge.yaml` for known environment issues and applies automatic fixes before the run starts.
 2. **Runner** — delegates to the correct runner skill (`flutter_drive` or Appium).
-3. **Knowledge learn** (Step 0b) — scans the run output for new errors and updates `qa-knowledge.yaml` with user confirmation.
+3. **Knowledge learn** (Step 0b) — scans the run output for new errors and updates `qa-plugin-config/qa-knowledge.yaml` with user confirmation.
 
-Optionally runs unit coverage after the main E2E pass. If `qa-knowledge.yaml` does not exist, behaves exactly as v1.1.x — the knowledge steps are no-ops.
+Optionally runs unit coverage after the main E2E pass. If `qa-plugin-config/qa-knowledge.yaml` does not exist, behaves exactly as v1.1.x — the knowledge steps are no-ops.
 
 ### When to use
 
@@ -126,7 +126,7 @@ Optionally runs unit coverage after the main E2E pass. If `qa-knowledge.yaml` do
 
 - **Mid-implementation** — partial code makes QA noisy.
 - **For code review** — use `superpowers:requesting-code-review` instead.
-- **Without `qa-agent.yaml`** — the agent needs it to route; it will ask the user for a path, but skipping the config is not recommended.
+- **Without `qa-plugin-config/qa-agent.yaml`** — the agent needs it to route; it will ask the user for a path, but skipping the config is not recommended.
 
 ### How to invoke
 
@@ -158,7 +158,7 @@ Or ask Claude directly: `"Invoca qa-stability-agent para validar la rama"`.
 
 **Scenario:** You just finished implementing a feature `password-recovery` using `my-subagent-driven-development`. All tasks are marked complete. You want to validate stability before opening a PR.
 
-**1. Ensure `qa-agent.yaml` exists:**
+**1. Ensure `qa-plugin-config/qa-agent.yaml` exists:**
 ```yaml
 project:
   platform: "android"
@@ -169,7 +169,7 @@ device:
 backend:
   test_url: "http://localhost:8080/api"
 reports:
-  output_dir: test/docs/QA_REPORTS
+  output_dir: qa-plugin-config/qa-reports
 post_run:
   include_unit: true        # also run unit coverage
 ```
@@ -180,7 +180,7 @@ user: "All tasks done, validar estabilidad"
 ```
 
 **3. What happens internally:**
-1. Agent reads `qa-agent.yaml`.
+1. Agent reads `qa-plugin-config/qa-agent.yaml`.
 2. `platform=android`, `android_stack=flutter_drive` → routes to `qa-flutter-manual-runner` with objective `regresion`.
 3. Manual runner executes all tests in `integration_test/manual/*.dart` sequentially.
 4. `post_run.include_unit == true` → for each feature mentioned in the implementation summary (here, `password-recovery`), invokes `qa-flutter-unit-generator --auto`.
@@ -188,9 +188,9 @@ user: "All tasks done, validar estabilidad"
 
 **4. What the agent returns:**
 ```
-Main QA report: test/docs/QA_REPORTS/2026-04-23T14-30-summary.md
+Main QA report: qa-plugin-config/qa-reports/2026-04-23T14-30-summary.md
 Unit reports:
-  - test/docs/QA_REPORTS/2026-04-23T14-42-password-recovery-unit.md
+  - qa-plugin-config/qa-reports/2026-04-23T14-42-password-recovery-unit.md
 Overall verdict: PASS
 ```
 
@@ -206,8 +206,8 @@ Overall verdict: PASS
 
 | Failure | Agent behavior |
 |---|---|
-| `qa-agent.yaml` not found | Asks for path; aborts if user doesn't provide |
-| `qa-knowledge.yaml` not found | Informs user; skips Steps 0a/0b and continues normally |
+| `qa-plugin-config/qa-agent.yaml` not found | Asks for path; aborts if user doesn't provide |
+| `qa-plugin-config/qa-knowledge.yaml` not found | Informs user; skips Steps 0a/0b and continues normally |
 | Preflight detects a blocking issue | Pauses and asks user: continue anyway or stop. In `--auto` mode: continues and logs a warning |
 | Preflight auto-fix fails | Shows `fallback_message` to user; asks whether to continue |
 | Delegated skill aborts in pre-flight (backend down, device missing) | Returns the pre-flight error message verbatim; no retry |
@@ -237,7 +237,7 @@ Why the default: fewer moving parts (no Python, no Appium server), faster feedba
 - Testing a pre-compiled APK (staging or release build) as a black box.
 - Portability to iOS at a later stage (Appium's protocol is cross-platform; `flutter_drive` tests require adaptation).
 
-Configure in `qa-agent.yaml`:
+Configure in `qa-plugin-config/qa-agent.yaml`:
 
 ```yaml
 project:
@@ -253,9 +253,9 @@ Full decision matrix: [docs/android-stacks.md](docs/android-stacks.md).
 
 ### Plan a feature before testing it (recommended for new / multi-screen features)
 ```
-/qa-plan <feature>                → produces qa-plans/<feature>.md
+/qa-plan <feature>                → produces qa-plugin-config/qa-plans/<feature>.md
                                     (review pantallas, precondiciones, flujos, criterios, riesgos)
-/qa-run  <feature> --plan=qa-plans/<feature>.md
+/qa-run  <feature> --plan=qa-plugin-config/qa-plans/<feature>.md
                                   → runner consumes the plan instead of guessing scope
 ```
 See [Planificación de QA](#planificación-de-qa) below for when planning is worth the extra step.
@@ -292,7 +292,7 @@ claude -p "/qa-release-gate --auto --threshold=strict" --output-format json
 
 Antes de v1.2 los runners hacían *semantic resolution* en caliente: leían el código en cada invocación para decidir qué pantallas / endpoints tocar. Funciona para features de una sola pantalla, pero deja al QA sin la oportunidad de **revisar el alcance antes** de generar y ejecutar tests, y no captura flujos multi-pantalla (checkout, onboarding, recuperación de contraseña).
 
-`qa-flutter-test-planner` (`/qa-plan`) introduce una fase de planificación explícita que produce un artefacto markdown auditable en `qa-plans/<feature>.md`. Los runners consumen ese plan vía `--plan=<path>`.
+`qa-flutter-test-planner` (`/qa-plan`) introduce una fase de planificación explícita que produce un artefacto markdown auditable en `qa-plugin-config/qa-plans/<feature>.md`. Los runners consumen ese plan vía `--plan=<path>`.
 
 ### ¿Qué contiene un plan?
 
@@ -316,12 +316,12 @@ Antes de v1.2 los runners hacían *semantic resolution* en caliente: leían el c
 | Smoke rápido durante desarrollo | ❌ Run directo |
 | CI / nightly | ✅ Si hay plan, los runners lo usan; si no, fallback a la lógica anterior |
 
-### Configuración — bloque `planning:` en `qa-agent.yaml`
+### Configuración — bloque `planning:` en `qa-plugin-config/qa-agent.yaml`
 
 ```yaml
 planning:
   enabled: true                       # default false → backward-compatible
-  test_plan_dir: "qa-plans/"          # dónde se leen / escriben los planes
+  test_plan_dir: "qa-plugin-config/qa-plans/"   # dónde se leen / escriben los planes
   require_plan: false                 # si true, runners abortan sin plan
   score_threshold: 40                 # score mínimo Layer 1 para incluir una pantalla
   flow_depth: 3                       # max transiciones del router por flujo
@@ -343,11 +343,12 @@ Si `planning.require_plan: true` y alguna feature carece de plan, el agente abor
 ### Plans son input, reports son output
 
 ```
-qa-plans/                              ← commiteable, versionable, editable a mano
-  login.md
-  checkout.md
-test/docs/QA_REPORTS/                  ← gitignored, generado por los runners
-  2026-05-04T14-30-login.md
+qa-plugin-config/
+  qa-plans/                            ← commiteable, versionable, editable a mano
+    login.md
+    checkout.md
+  qa-reports/                          ← gitignored, generado por los runners
+    2026-05-04T14-30-login.md
 ```
 
 Los planes se commitean: viven con el código y se editan por PR como cualquier doc. Los reportes son ephemeros: cada run genera uno nuevo.
@@ -356,9 +357,9 @@ Más detalle: [skills/qa-flutter-test-planner/README.md](skills/qa-flutter-test-
 
 ---
 
-## Configuration — `qa-agent.yaml`
+## Configuration — `qa-plugin-config/qa-agent.yaml`
 
-All components resolve this file at runtime by: (1) cwd, (2) walking up to find `pubspec.yaml`, (3) asking the user. **No hardcoded paths.**
+All components resolve this file at runtime by: (1) `qa-plugin-config/qa-agent.yaml` in cwd, (2) walking up to find `pubspec.yaml` then checking `qa-plugin-config/qa-agent.yaml` there, (3) asking the user. **No hardcoded paths.**
 
 ### Flutter web
 ```yaml
@@ -372,7 +373,7 @@ project:
     email: qa@example.com
     password: secret
 agent:
-  reports_output_dir: qa-reports
+  reports_output_dir: qa-reports      # relative to qa-plugin-config/ → qa-plugin-config/qa-reports/
 ```
 
 ### Android — flutter_drive stack (recommended default)
@@ -392,13 +393,13 @@ execution:
 backend:
   test_url: "http://localhost:8080/api"
 reports:
-  output_dir: test/docs/QA_REPORTS
+  output_dir: qa-plugin-config/qa-reports
 unit:                             # optional — for unit-generator
   test_root: test
   coverage_target: 80
 ```
 
-Plus `.env` at the Flutter project root:
+Plus `qa-plugin-config/.env` at the project:
 ```
 TEST_EMAIL=qa-user@test.com
 TEST_PASSWORD=your-test-password
@@ -462,7 +463,7 @@ Full rules in [qa-flutter-release-gate/references/severity-rules.md](skills/qa-f
 | `normal` (default) | 0 Critical, 0 High |
 | `lenient` | 0 Critical |
 
-### Gate config in `qa-agent.yaml`
+### Gate config in `qa-plugin-config/qa-agent.yaml`
 
 ```yaml
 release_gate:
@@ -516,13 +517,13 @@ Since the release that introduces `qa-flutter-bootstrap`, the release gate runs 
 
 ### Enable it
 
-Add an `autonomous` block to your `qa-agent.yaml`:
+Add an `autonomous` block to your `qa-plugin-config/qa-agent.yaml`:
 
 ```yaml
 autonomous:
   backend:
     start_cmd: "./gradlew bootRun --args='--spring.profiles.active=test'"
-    start_cwd: "../transfer_rest_api"         # relative to this yaml's directory
+    start_cwd: "../transfer_rest_api"         # relative to PROJECT_ROOT (parent of qa-plugin-config/)
     health_url: "http://localhost:8080/api/health"
     ready_timeout_seconds: 120                # optional, default 120
     stop_cmd: "pkill -f 'gradlew bootRun'"    # optional; kill by pid is fallback
@@ -647,19 +648,19 @@ The skill is idempotent — it tears down only what the marker says was started,
   └─ Step 0b: /qa-knowledge-manager learn       ← AFTER the run
 ```
 
-**Preflight** reads `qa-knowledge.yaml`, finds active entries whose `preflight_check` matches the current environment, and applies solutions automatically (`auto_apply: true`) or prompts the user (`auto_apply: false`). Common examples: starting a stopped emulator, freeing a blocked port, verifying backend health.
+**Preflight** reads `qa-plugin-config/qa-knowledge.yaml`, finds active entries whose `preflight_check` matches the current environment, and applies solutions automatically (`auto_apply: true`) or prompts the user (`auto_apply: false`). Common examples: starting a stopped emulator, freeing a blocked port, verifying backend health.
 
-**Learn** scans the run output for new errors, checks whether they were already registered, and drafts new `qa-knowledge.yaml` entries — with the user confirming before anything is written.
+**Learn** scans the run output for new errors, checks whether they were already registered, and drafts new `qa-plugin-config/qa-knowledge.yaml` entries — with the user confirming before anything is written.
 
 ### Enabling it
 
-Copy the starter template to your project root:
+Copy the starter template to your project's `qa-plugin-config/` folder:
 
 ```bash
-cp ~/.claude/plugins/local/qa-flutter/templates/qa-knowledge.yaml ./qa-knowledge.yaml
+cp ~/.claude/plugins/local/qa-flutter/templates/qa-knowledge.yaml ./qa-plugin-config/qa-knowledge.yaml
 ```
 
-Commit `qa-knowledge.yaml` with your project — it is project-specific and grows with your environment. If the file is absent, the knowledge steps are no-ops and the orchestrator behaves exactly as v1.1.x.
+Commit `qa-plugin-config/qa-knowledge.yaml` with your project — it is project-specific and grows with your environment. If the file is absent, the knowledge steps are no-ops and the orchestrator behaves exactly as v1.1.x.
 
 ### Manual modes
 
@@ -670,11 +671,11 @@ Commit `qa-knowledge.yaml` with your project — it is project-specific and grow
 /qa-knowledge-manager report      # audit current knowledge base
 ```
 
-### Add it to `qa-agent.yaml` (optional path override)
+### Add it to `qa-plugin-config/qa-agent.yaml` (optional path override)
 
 ```yaml
 knowledge:
-  path: "./qa-knowledge.yaml"     # default: project root
+  path: "./qa-plugin-config/qa-knowledge.yaml"     # default: qa-plugin-config/
 ```
 
 ---
@@ -685,7 +686,7 @@ knowledge:
 
 | Skill | Report path |
 |---|---|
-| `qa-flutter-manual-runner` | `test/docs/QA_REPORTS/{timestamp}-{feature}.md` |
+| `qa-flutter-manual-runner` | `qa-plugin-config/qa-reports/{timestamp}-{feature}.md` |
 | `qa-flutter-unit-generator` | `{reports.output_dir}/{timestamp}-{feature}-unit.md` |
 | `qa-flutter-android-runner` | `{qa-agent-dir}/{reports_output_dir}/{timestamp}-{feature}.md` |
 | `qa-flutter-web-runner` | `{qa-agent-dir}/{reports_output_dir}/{timestamp}-web-checklist.md` |
@@ -736,7 +737,7 @@ qa-flutter/
     qa-flutter-bootstrap/
     qa-knowledge-manager/           ← autoaprendizaje cycle
   templates/
-    qa-knowledge.yaml               ← starter template; copy to project root
+    qa-knowledge.yaml               ← starter template; copy to qa-plugin-config/
   docs/
     android-stacks.md               ← decision matrix
   README.md                         ← this file
@@ -754,7 +755,7 @@ If you already use the Appium stack (`project.android_stack: "appium"`), the rel
 1. Read the [contract doc](docs/references/appium-bootstrap-contract.md).
 2. Update `scripts/bootstrap.py` to accept `--marker` and write the marker YAML atomically.
 3. Update `scripts/teardown.py` to accept `--marker`, read it, clean up, and delete it on success.
-4. Update your `qa-agent.yaml` to use the unified `autonomous.*` block (previously you may have had `backend_endpoint`, `appium.boot`, etc. in custom fields).
+4. Update your `qa-plugin-config/qa-agent.yaml` to use the unified `autonomous.*` block (previously you may have had `backend_endpoint`, `appium.boot`, etc. in custom fields).
 5. Test end-to-end with: `claude -p "/qa-release-gate --auto"`.
 
 **During the deprecation window (current minor release):** if your scripts ignore `--marker`, the plugin falls back to the legacy `bootstrap-status.json` method and synthesizes a minimal marker. A deprecation warning is printed. At the next minor release, this fallback is removed and Appium runs will fail unless your scripts are updated.
@@ -765,8 +766,8 @@ If you already use the Appium stack (`project.android_stack: "appium"`), the rel
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Agent replies "¿Cuál es la ruta absoluta al archivo qa-agent.yaml?" | yaml not found in cwd or parent | Create the yaml at project root, or answer with absolute path |
-| "Backend no disponible" pre-flight error | Test backend not running, or `API_BASE_URL` mismatch | Start test backend; verify `.env` matches `backend.test_url` |
+| Agent replies "¿Cuál es la ruta absoluta al archivo qa-plugin-config/qa-agent.yaml?" | yaml not found in cwd or parent | Create `qa-plugin-config/qa-agent.yaml` at project root, or answer with absolute path |
+| "Backend no disponible" pre-flight error | Test backend not running, or `API_BASE_URL` mismatch | Start test backend; verify `qa-plugin-config/.env` matches `backend.test_url` |
 | "No hay dispositivos ADB ni AVDs disponibles" | No emulator running and no AVD to launch | Start an emulator manually or create an AVD in Android Studio |
 | Tests pass locally but fail in CI | Flaky timing, screen size, or device state | Check report — look for `TOKEN_RETRY` notes or missing `pumpAndSettle` |
 | `BUILD_FAILED` in web runner | Compile errors in Flutter web target | Run `flutter build web` manually and fix before re-running QA |

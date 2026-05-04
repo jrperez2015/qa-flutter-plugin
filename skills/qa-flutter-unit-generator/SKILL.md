@@ -57,11 +57,11 @@ In `AUTO_MODE`, print: `Ejecutando en modo automático — sin interacción dura
 
 ## Step 2 — Read configuration
 
-Read `qa-agent.yaml` from project root (cwd → walk up to `pubspec.yaml` sibling → ask user). Extract with defaults:
+Read `qa-plugin-config/qa-agent.yaml` from project root (cwd → walk up to `pubspec.yaml` sibling → ask user). Extract with defaults:
 
 | Variable | yaml path | Default |
 |---|---|---|
-| `REPORTS_DIR` | `reports.output_dir` | `test/docs/QA_REPORTS` |
+| `REPORTS_DIR` | `reports.output_dir` | `qa-plugin-config/qa-reports` |
 | `UNIT_TEST_ROOT` | `unit.test_root` | `test` |
 | `COVERAGE_TARGET` | `unit.coverage_target` | `80` |
 | `UNIT_TIMEOUT` | `timeouts.unit_test_seconds` | `60` |

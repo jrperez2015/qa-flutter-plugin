@@ -11,7 +11,7 @@ then write a Markdown report. You have no memory of other features or previous r
 
 ## Inputs (passed in the prompt that invoked you)
 
-- `CONFIG_PATH`: absolute path to qa-agent.yaml
+- `CONFIG_PATH`: absolute path to `qa-plugin-config/qa-agent.yaml`
 - `FEATURE_NAME`: the feature to test (e.g. "signup", "login")
 - `QA_AGENT_DIR`: absolute path to the qa-agent/ scripts directory
 - `BACKEND_PATH` *(optional)*: overrides `project.backend.path` from config if provided
@@ -72,7 +72,7 @@ Write the steps to `{QA_AGENT_DIR}/{reports_output_dir}/steps-{FEATURE_NAME}.jso
 Run via Bash (cwd must be QA_AGENT_DIR):
 ```
 cd {QA_AGENT_DIR} && python scripts/appium_runner.py \
-  --config qa-agent.yaml \
+  --config qa-plugin-config/qa-agent.yaml \
   --steps {reports_output_dir}/steps-{FEATURE_NAME}.json \
   --feature {FEATURE_NAME} \
   --timeout {feature_timeout_seconds}

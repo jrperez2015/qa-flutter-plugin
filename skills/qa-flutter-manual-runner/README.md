@@ -42,9 +42,9 @@ qa-flutter-plugin/
       SKILL.md
 ```
 
-### 2. Crear `qa-agent.yaml`
+### 2. Crear `qa-plugin-config/qa-agent.yaml`
 
-Copiar esta plantilla en la raíz del proyecto y completar los valores:
+Crear el directorio `qa-plugin-config/` en la raíz del proyecto y copiar esta plantilla:
 
 ```yaml
 device:
@@ -65,14 +65,14 @@ backend:
                                          # API_BASE_URL en .env debe coincidir
 
 reports:
-  output_dir: test/docs/QA_REPORTS
+  output_dir: qa-plugin-config/qa-reports
 ```
 
 > **`backend.test_url` es obligatorio.** El skill no ejecuta si este campo está vacío.
-> El pre-flight verifica que `API_BASE_URL` en `.env` coincida exactamente con este valor,
+> El pre-flight verifica que `API_BASE_URL` en `qa-plugin-config/.env` coincida exactamente con este valor,
 > protegiendo datos de producción ante errores de configuración.
 
-### 3. Crear `.env`
+### 3. Crear `qa-plugin-config/.env`
 
 ```
 API_BASE_URL=http://localhost:8080/api
@@ -80,13 +80,13 @@ TEST_EMAIL=qa-user@test.com
 TEST_PASSWORD=your-test-password
 ```
 
-> `.env` nunca se commitea. Agregar a `.gitignore` si no está ya.
+> `qa-plugin-config/.env` nunca se commitea. Agregar a `.gitignore` si no está ya.
 
 ### 4. Agregar a `.gitignore`
 
 ```
-qa-agent.yaml
-test/docs/QA_REPORTS/
+qa-plugin-config/.env
+qa-plugin-config/qa-reports/
 ```
 
 ### 5. Añadir `integration_test` a `pubspec.yaml`
@@ -123,7 +123,7 @@ void main() {
 /qa-run login
 ```
 
-El skill busca `integration_test/manual/login_test.dart`. Si existe, lo ejecuta con `flutter drive` y genera un informe en `test/docs/QA_REPORTS/`.
+El skill busca `integration_test/manual/login_test.dart`. Si existe, lo ejecuta con `flutter drive` y genera un informe en `qa-plugin-config/qa-reports/`.
 
 ### Testear una feature nueva
 
@@ -166,7 +166,7 @@ claude -p "/qa-run regresion --auto" --output-format json
 
 Antes de ejecutar cualquier test, el skill verifica en este orden:
 
-1. **`.env` completo y seguro** — campos requeridos presentes, `API_BASE_URL` coincide con `backend.test_url`
+1. **`qa-plugin-config/.env` completo y seguro** — campos requeridos presentes, `API_BASE_URL` coincide con `backend.test_url`
 2. **Backend disponible** — `GET /health`, si no existe: `POST /login` con las credenciales del `.env`
 3. **Dispositivo activo** — si no hay dispositivo, intenta levantar el primer AVD disponible (timeout 90s)
 4. **`test_runner.dart` existe** — lo crea automáticamente si falta
@@ -211,7 +211,7 @@ void main() {
 
 ## Report format
 
-Cada test genera un informe individual en `test/docs/QA_REPORTS/`:
+Cada test genera un informe individual en `qa-plugin-config/qa-reports/`:
 
 ```
 YYYY-MM-DDTHH-MM-<feature>.md      ← informe por feature
@@ -258,8 +258,10 @@ Con esta configuración, `API_BASE_URL` apunta al backend en perfil `test` y tod
 
 ```
 <project-root>/
-  qa-agent.yaml                          ← config local (excluido de git)
-  .env                                   ← credenciales (excluido de git)
+  qa-plugin-config/
+    qa-agent.yaml                        ← config local (excluido de git)
+    .env                                 ← credenciales (excluido de git)
+    qa-reports/                          ← informes generados (excluidos de git)
   integration_test/
     fixtures/
       test_runner.dart                   ← entry point de flutter drive
@@ -267,8 +269,6 @@ Con esta configuración, `API_BASE_URL` apunta al backend en perfil `test` y tod
       login_test.dart                    ← tests persistidos (commiteados)
       transferencia_test.dart
       ...
-  test/docs/
-    QA_REPORTS/                          ← informes generados (excluidos de git)
   qa-flutter-plugin/
     skills/
       qa-flutter-manual-runner/

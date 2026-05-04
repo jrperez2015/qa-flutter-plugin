@@ -1,6 +1,6 @@
 # QA Test Plan Template
 
-This is the canonical template that `qa-flutter-test-planner` substitutes when writing `qa-plans/<feature>.md`. Placeholders are wrapped in `{ }`. Optional sections are marked `{IF ... }` / `{END IF}`.
+This is the canonical template that `qa-flutter-test-planner` substitutes when writing `qa-plugin-config/qa-plans/<feature>.md`. Placeholders are wrapped in `{ }`. Optional sections are marked `{IF ... }` / `{END IF}`.
 
 The template MUST stay backward-compatible: the runners parse the YAML frontmatter and the section headings (`## 1.`, `## 2.`, ...) by exact match. Free-form text inside each section is preserved verbatim and never parsed by the runners.
 
