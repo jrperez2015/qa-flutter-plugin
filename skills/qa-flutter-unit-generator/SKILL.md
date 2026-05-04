@@ -127,6 +127,17 @@ For each requested layer:
 
 ## Section A — Semantic resolution
 
+**IMPORTANT — Grep before Read:** After Glob, use Grep to filter candidates before doing
+full file reads. Only Read files that score non-zero on a name/content grep. This avoids
+reading the full source of repository/service/bloc files unrelated to FEATURE.
+
+```bash
+# Quick filter: which globbed files reference FEATURE keywords?
+grep -rl "{FEATURE}" {GLOBBED_FILES} -i
+```
+Read only the Grep matches in full. For files not matched by Grep, use `limit: 30` to
+read just the class declaration (enough to score on class name). Skip them if score ≤ 0.
+
 ### A.1 — Repository candidates
 
 Glob `lib/**/*_repository*.dart`, `lib/**/*_service*.dart`, `lib/**/*_datasource*.dart`, `lib/**/*_dao*.dart`, `lib/src/data/**/*.dart`, `lib/src/domain/**/*.dart`. Score 0–100:

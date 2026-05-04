@@ -64,6 +64,9 @@ If `qa-agent.yaml` does not exist → abort:
    Crea el archivo con la configuración del dispositivo y backend.
 ```
 
+**Read `pubspec.yaml` once here** — extract `name:` → `PUBSPEC_NAME` and `version:` → `PUBSPEC_VERSION`.
+Both values are reused in Section C.3.2, E, and F. Do NOT read `pubspec.yaml` again in those sections.
+
 ## Step 3 — Pre-flight checks
 
 Execute in order. Each failure aborts the run without executing any tests.
@@ -238,10 +241,26 @@ If `PLAN_PATH` is empty, fall through to C.1 (legacy on-the-fly resolution — u
 
 ### C.1 — Semantic resolution (three layers)
 
+**IMPORTANT — Grep before Read:** Do NOT read all dart files upfront. Use Grep to identify
+candidate files first, then Read only those files. This avoids loading irrelevant source
+files into context (the main source of unnecessary token usage in this skill).
+
 **Layer 1 — Pages**
 
-Read all `.dart` files in `lib/src/pages/` and `lib/core/` (use Glob + Read).
-For each file, assign a score 0–100:
+Step 1a — Grep for class/file name matches:
+```bash
+grep -rl "{FEATURE}" lib/src/pages/ lib/core/ --include="*.dart"
+```
+Step 1b — Grep for FEATURE keywords in class declarations:
+```bash
+grep -rl "class.*{FEATURE}" lib/src/pages/ lib/core/ --include="*.dart" -i
+```
+Merge both lists (deduplicated) → `CANDIDATE_FILES`.
+
+If `CANDIDATE_FILES` is empty → fallback: Glob all `*.dart` in `lib/src/pages/` but Read
+only the first 50 lines of each (enough to get the class name and imports) using `limit: 50`.
+
+Step 1c — Read only `CANDIDATE_FILES` (full read). For each, assign a score 0–100:
 - Class name contains keywords from FEATURE: **+40**
 - Associated provider/bloc has HTTP endpoint matching FEATURE keywords: **+35**
 - Page appears as route destination in `lib/config/app_router.dart`: **+25**
@@ -309,7 +328,7 @@ Analyze `page_file` and `provider_file` to identify navigation path, widget find
 - Si necesitás el widget completo (no solo hijo): usar `find.ancestor(of: find.text('{label}'), matching: find.byWidgetPredicate((w) => w is ButtonStyleButton))` — match por superclase pública.
 - Regla general: si un widget se instancia vía constructor factory con nombre (`.icon`, `.small`, etc.), asumir que el tipo runtime es privado hasta verificar lo contrario.
 
-Read `pubspec.yaml` → extract the `name:` field → `APP_PACKAGE`. This is the Dart package name; it is project-specific and MUST be resolved at generation time. Never hardcode.
+Use `PUBSPEC_NAME` extracted in Step 2 as `APP_PACKAGE`. Do NOT read `pubspec.yaml` again here.
 
 Write `TEST_FILE`:
 ```dart
@@ -406,7 +425,7 @@ Return: `RESULT`, `DRIVE_OUTPUT`, `DURATION`, `TOKEN_RETRY`.
 ## Section E — Individual Report
 
 `TIMESTAMP` = current datetime as `YYYY-MM-DDTHH-MM`.
-Read `pubspec.yaml` → extract `name:` field → `APP_PACKAGE`, and `version:` field → `APP_VERSION`.
+Use `PUBSPEC_NAME` → `APP_PACKAGE` and `PUBSPEC_VERSION` → `APP_VERSION` (read once in Step 2). Do NOT re-read `pubspec.yaml`.
 Parse `DRIVE_OUTPUT` for step results where possible.
 
 Result emoji: PASS → ✅ PASS | PARCIAL → ⚠ PARCIAL | else → ❌ {RESULT}
@@ -449,6 +468,11 @@ Write to `{REPORTS_DIR}/{TIMESTAMP}-{FEATURE}.md`:
  - ^(E|F)/
  if matches < 5 → fallback to tail -40 of raw DRIVE_OUTPUT with header "filtering produced insufficient lines".}
 ```
+
+**Context budget for DRIVE_OUTPUT analysis:** Limit to the last 300 lines of DRIVE_OUTPUT when
+searching for errors and stack traces. Full output beyond that rarely adds diagnostic value and
+consumes context unnecessarily. If a specific error reference requires earlier context, search
+by line number rather than loading everything.
 {end if}
 
 ## Pendientes para corrección
@@ -466,7 +490,7 @@ Print path to report file.
 ## Section F — Summary Report (regresion mode only)
 
 `TIMESTAMP` = current datetime as `YYYY-MM-DDTHH-MM`.
-Read `APP_PACKAGE` (name) and `APP_VERSION` from `pubspec.yaml`.
+Use `PUBSPEC_NAME` → `APP_PACKAGE` and `PUBSPEC_VERSION` → `APP_VERSION` (already set in Step 2). Do NOT re-read `pubspec.yaml`.
 
 Write to `{REPORTS_DIR}/{TIMESTAMP}-summary.md`:
 

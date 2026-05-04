@@ -1,0 +1,312 @@
+# ============================================================
+# qa-knowledge.yaml — Base de conocimiento QA Autónomo v2
+# Colocar en la raíz del proyecto Flutter, junto a qa-agent.yaml
+# ============================================================
+#
+# Este archivo registra errores conocidos y sus soluciones.
+# El agente lo lee antes de cada ejecución (preflight) y lo
+# actualiza automáticamente cuando encuentra y resuelve errores nuevos.
+#
+# CÓMO AÑADIR UNA SOLUCIÓN MANUALMENTE:
+#   1. Copia el bloque de ejemplo de abajo
+#   2. Asigna un ID único (K001, K002, ...)
+#   3. Rellena pattern, preflight_check y solution
+#   4. Pon registered_by: "user"
+#
+# CATEGORÍAS válidas: environment | build | ci
+# TIPOS de solución : command | manual | config_patch
+# ============================================================
+
+version: "1.0"
+updated_at: "2026-05-02"
+
+errors:
+
+  # ----------------------------------------------------------
+  # ENTORNO — Emulador
+  # ----------------------------------------------------------
+  - id: "K001"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "environment"
+    description: "Emulador Android no encontrado o no iniciado"
+    enabled: true
+
+    # Regex aplicado contra stdout/stderr de cualquier comando del run
+    pattern: "No devices found|no connected devices|error: no devices/emulators found"
+
+    # Verificación proactiva que se ejecuta ANTES del run
+    preflight_check:
+      type: "command"
+      # Retorna 0 si hay al menos un emulador listado, distinto de 0 si no
+      command: "adb devices 2>/dev/null | grep -c 'emulator\\|device$'"
+      # Si el resultado es menor que este número, se considera error detectado
+      min_expected: 1
+
+    solution:
+      auto_apply: true
+      type: "command"
+      steps:
+        - cmd: "emulator -avd ${QA_AVD_NAME:-Pixel_5_API_33} &"
+          wait_seconds: 5
+          description: "Lanzar AVD en segundo plano"
+        - cmd: "adb wait-for-device"
+          wait_seconds: 60
+          description: "Esperar a que el dispositivo esté listo"
+      fallback_message: |
+        No se pudo iniciar el emulador automáticamente.
+        Ejecutar manualmente: emulator -avd Pixel_5_API_33
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null    # "success" | "failure"
+
+  # ----------------------------------------------------------
+  # ENTORNO — Puerto del backend ocupado
+  # ----------------------------------------------------------
+  - id: "K002"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "environment"
+    description: "Puerto 8080 ocupado — backend no puede arrancar"
+    enabled: true
+
+    pattern: "Address already in use.*8080|Port 8080.*in use|Bind.*8080.*fail"
+
+    preflight_check:
+      type: "command"
+      command: "lsof -ti:8080 2>/dev/null | wc -l | tr -d ' '"
+      # Si retorna > 0 hay un proceso en ese puerto
+      min_expected: 0
+      invert: true    # error si el resultado >= min_expected
+
+    solution:
+      auto_apply: true
+      type: "command"
+      steps:
+        - cmd: "lsof -ti:8080 | xargs kill -9 2>/dev/null || true"
+          wait_seconds: 2
+          description: "Matar proceso en puerto 8080"
+      fallback_message: |
+        No se pudo liberar el puerto 8080.
+        Ejecutar manualmente: lsof -ti:8080 | xargs kill -9
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+  # ----------------------------------------------------------
+  # ENTORNO — Backend no responde (health check)
+  # ----------------------------------------------------------
+  - id: "K003"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "environment"
+    description: "Backend no disponible en la URL de health check"
+    enabled: true
+
+    pattern: "Connection refused.*8080|backend.*unreachable|health.*check.*failed|ECONNREFUSED"
+
+    preflight_check:
+      type: "command"
+      command: "curl -sf ${QA_BACKEND_HEALTH:-http://localhost:8080/api/health} -o /dev/null; echo $?"
+      min_expected: 0
+      invert: true    # error si curl retorna != 0 (no responde)
+
+    solution:
+      auto_apply: false    # requiere contexto del proyecto para el start_cmd
+      type: "manual"
+      steps: []
+      fallback_message: |
+        El backend no está disponible. Levantarlo antes del run o configurar
+        autonomous.backend.start_cmd en qa-agent.yaml (ver G1 en el roadmap).
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+  # ----------------------------------------------------------
+  # BUILD — flutter pub get falla por conflicto de versiones
+  # ----------------------------------------------------------
+  - id: "K004"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "build"
+    description: "flutter pub get falla por versiones incompatibles en pubspec.yaml"
+    enabled: true
+
+    pattern: "version solving failed|Because .* depends on .* which doesn't match|pub get failed"
+
+    preflight_check:
+      type: "command"
+      command: "flutter pub get --dry-run 2>&1 | grep -c 'version solving failed' || true"
+      min_expected: 0
+      invert: true
+
+    solution:
+      auto_apply: true
+      type: "command"
+      steps:
+        - cmd: "flutter pub cache repair"
+          wait_seconds: 30
+          description: "Reparar caché de pub"
+        - cmd: "flutter pub get"
+          wait_seconds: 60
+          description: "Reintentar pub get"
+      fallback_message: |
+        Revisar pubspec.yaml para resolver conflictos de versiones manualmente.
+        Usar: flutter pub deps para ver el árbol de dependencias.
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+  # ----------------------------------------------------------
+  # BUILD — Gradle build falla por caché corrompida
+  # ----------------------------------------------------------
+  - id: "K005"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "build"
+    description: "Gradle falla con caché corrompida o lock file"
+    enabled: true
+
+    pattern: "Could not resolve|Gradle build failed|Could not lock.*lock|BUILD FAILED.*daemon"
+
+    preflight_check: null    # Solo se detecta durante el run, no hay preflight útil
+
+    solution:
+      auto_apply: true
+      type: "command"
+      steps:
+        - cmd: "cd android && ./gradlew clean 2>/dev/null || true"
+          wait_seconds: 30
+          description: "Limpiar build de Gradle"
+        - cmd: "flutter clean"
+          wait_seconds: 15
+          description: "Limpiar build de Flutter"
+        - cmd: "flutter pub get"
+          wait_seconds: 60
+          description: "Regenerar dependencias"
+      fallback_message: |
+        Limpiar manualmente: flutter clean && cd android && ./gradlew clean
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+  # ----------------------------------------------------------
+  # CI — Variable de entorno faltante
+  # ----------------------------------------------------------
+  - id: "K006"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "ci"
+    description: "Variable de entorno requerida no definida en el entorno de CI"
+    enabled: true
+
+    pattern: "Environment variable.*not set|\\$\\{[A-Z_]+\\}.*undefined|getenv.*null"
+
+    preflight_check: null
+
+    solution:
+      auto_apply: false
+      type: "manual"
+      steps: []
+      fallback_message: |
+        Verificar que las variables de entorno estén definidas en el pipeline.
+        Variables comunes: QA_BACKEND_URL, QA_AVD_NAME, ANDROID_HOME, FLUTTER_HOME.
+        Ver docs/ci-variables.md para la lista completa.
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+  # ----------------------------------------------------------
+  # CI — Timeout en step de CI
+  # ----------------------------------------------------------
+  - id: "K007"
+    registered_at: "2026-05-02"
+    registered_by: "template"
+    category: "ci"
+    description: "Step de CI supera el timeout configurado"
+    enabled: true
+
+    pattern: "Process killed.*timeout|Timed out after|Job cancelled.*exceeded.*limit"
+
+    preflight_check: null
+
+    solution:
+      auto_apply: false
+      type: "config_patch"
+      steps: []
+      config_hint: |
+        En el archivo de pipeline (.github/workflows/*.yml o similar), aumentar
+        el timeout del job o step que falla. Ejemplo para GitHub Actions:
+          jobs:
+            qa:
+              timeout-minutes: 45   # aumentar según sea necesario
+      fallback_message: |
+        Revisar el tiempo de ejecución del run anterior y ajustar el timeout del pipeline.
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+  # ----------------------------------------------------------
+  # ENTORNO — Emulador no puede alcanzar localhost del host
+  # Registrado por: usuario
+  # Contexto: el emulador Android corre en una red NAT propia.
+  # Para que alcance puertos del PC host se necesita adb reverse.
+  # Este mapeo NO persiste tras reinicio del emulador, por eso
+  # el preflight lo verifica y aplica en cada run.
+  # ----------------------------------------------------------
+  - id: "K008"
+    registered_at: "2026-05-02"
+    registered_by: "user"
+    category: "environment"
+    description: "Emulador no puede alcanzar localhost del host — falta adb reverse tcp:1980"
+    enabled: true
+
+    # Coincide con errores de conexión rechazada al puerto de la API
+    # Ajustar el puerto (1980) si el backend corre en uno distinto
+    pattern: "Connection refused.*:1980|ECONNREFUSED.*1980|Failed to connect.*localhost:1980|connect ECONNREFUSED 10\\.0\\.2\\.2:1980"
+
+    preflight_check:
+      type: "command"
+      # Verifica si el túnel ya está activo. Retorna 1 si está, 0 si no.
+      command: "adb reverse --list 2>/dev/null | grep -c 'tcp:1980' || echo 0"
+      min_expected: 1
+      # NO usa invert: el check falla cuando el conteo es 0 (túnel no existe)
+
+    solution:
+      auto_apply: true
+      type: "command"
+      steps:
+        - cmd: "adb reverse tcp:1980 tcp:1980"
+          wait_seconds: 2
+          description: "Mapear puerto 1980 del emulador al puerto 1980 del host"
+      fallback_message: |
+        El emulador no puede alcanzar el backend en el host.
+        Ejecutar manualmente antes del run: adb reverse tcp:1980 tcp:1980
+        Nota: este mapeo desaparece al reiniciar el emulador — el preflight
+        lo restaura automáticamente en cada run.
+
+    stats:
+      applied_count: 0
+      last_applied: null
+      last_result: null
+
+# ============================================================
+# ERRORES REGISTRADOS POR EL AGENTE
+# El agente añade entradas debajo de esta línea automáticamente.
+# No eliminar este comentario — sirve como marcador de inserción.
+# ============================================================
+# [AGENT_ENTRIES_START]

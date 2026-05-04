@@ -30,6 +30,21 @@ QA planning layer. Closes roadmap gap **G8** (planning artifact). Backward-compa
 
 - **G8 — Planning artifact** ✅ closed in this release.
 
+## [1.2.0] — 2026-05-02
+
+Self-learning cycle (autoaprendizaje) and skill performance improvements.
+
+### Added
+
+- **`qa-knowledge-manager` skill** — autoaprendizaje cycle that wraps every QA run with two transparent steps: `preflight` (applies known environment fixes before the run) and `learn` (captures new errors after the run and updates `qa-knowledge.yaml` with user confirmation). Also exposes `register` (manual fix entry) and `report` (knowledge base audit) modes.
+- **`templates/qa-knowledge.yaml`** — starter template for the knowledge file. Copy to project root and commit with the project; if absent, the orchestrator behaves exactly as v1.1.x.
+
+### Changed
+
+- **`qa-stability-agent` → v2.1** — adds Steps 0a (knowledge preflight) and 0b (knowledge learn) as non-fatal wrappers around the existing run. New flags: `--auto` (CI non-interactive), `--dry-run` (simulate plan without running tests), `--skip-preflight`, `--skip-learn`. Verdict semantics updated: `GO` / `NO-GO` / `CONDITIONAL` with exit codes 0 / 1 / 2 respectively. Fully backwards-compatible: without `qa-knowledge.yaml` the agent is identical to v2.0.
+- **`qa-flutter-manual-runner`** — Grep-before-Read optimization in the semantic resolution phase; `pubspec.yaml` is now read once in Step 2 and reused in Sections C and E, eliminating redundant reads per feature.
+- **`qa-flutter-unit-generator`** — Grep-before-Read filter applied before full file reads in Section A (repository/bloc/widget candidates), reducing unnecessary context load on large codebases.
+
 ## [1.1.1] — 2026-04-24
 
 Usability patch — slash commands and CLI permission docs.
